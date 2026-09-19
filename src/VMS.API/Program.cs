@@ -22,11 +22,17 @@ if (appSettings.Secret.Length < 32)
     throw new InvalidOperationException(
         "AppSettings:Secret must be set to at least 32 characters (user-secrets, environment variable or appsettings).");
 
-// ── CORS — only the origins listed in Cors:AllowedOrigins ────────────────────
+// ── CORS — only the origins listed in Cors:AllowedOrigins (Development also accepts any
+// localhost port, since the Angular dev server's port varies between runs) ──────────────
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("CorsPolicy", policy =>
 {
-    if (allowedOrigins.Length > 0)
+    if (builder.Environment.IsDevelopment())
+        policy.SetIsOriginAllowed(origin =>
+                  Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                  (uri.Host is "localhost" or "127.0.0.1"))
+              .AllowAnyMethod().AllowAnyHeader();
+    else if (allowedOrigins.Length > 0)
         policy.WithOrigins(allowedOrigins).AllowAnyMethod().AllowAnyHeader();
 }));
 

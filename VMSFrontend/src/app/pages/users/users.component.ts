@@ -75,7 +75,7 @@ import { UserDetail, UserListFilter, UserListItem } from '../../core/models';
         <div class="field"><label>Phone</label><input pInputText formControlName="phone" /></div>
         <div class="field"><label>Department</label><input pInputText formControlName="department" /></div>
         <div class="field full"><label>Role *</label>
-          <p-select [options]="roleOptions()" optionLabel="name" optionValue="roleId" formControlName="roleId" placeholder="Choose a role" [fluid]="true" />
+          <p-select [options]="roleOptions()" optionLabel="name" optionValue="roleId" formControlName="roleId" placeholder="Choose a role" [fluid]="true" appendTo="body" />
         </div>
         <div class="full muted">They get an email with a one-time link to set their password.</div>
       </form>
@@ -103,7 +103,7 @@ import { UserDetail, UserListFilter, UserListItem } from '../../core/models';
     <p-dialog header="Change role" [(visible)]="roleVisible" [modal]="true" [style]="{ width: '420px' }">
       <div class="field">
         <label>Role for {{ target()?.firstName }} {{ target()?.lastName }}</label>
-        <p-select [options]="roleOptions()" optionLabel="name" optionValue="roleId" [(ngModel)]="newRoleId" [fluid]="true" />
+        <p-select [options]="roleOptions()" optionLabel="name" optionValue="roleId" [(ngModel)]="newRoleId" [fluid]="true" appendTo="body" />
         <span class="hint">They will be signed out so the new role takes effect.</span>
       </div>
       <ng-template pTemplate="footer">
