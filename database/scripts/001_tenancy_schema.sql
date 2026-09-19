@@ -70,6 +70,33 @@ BEGIN
     VALUES (N'20260919090540_InitialTenancy', N'9.0.2');
 END;
 
+IF NOT EXISTS (
+    SELECT * FROM [tenancy].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260919230142_AddTenantLogos'
+)
+BEGIN
+    CREATE TABLE [tenancy].[TenantLogos] (
+        [TenantId] uniqueidentifier NOT NULL,
+        [Variant] nvarchar(5) NOT NULL,
+        [ContentType] nvarchar(50) NOT NULL,
+        [Content] varbinary(max) NOT NULL,
+        [Version] nvarchar(64) NOT NULL,
+        [UpdatedAt] datetime2 NOT NULL,
+        [UpdatedBy] int NOT NULL,
+        CONSTRAINT [PK_TenantLogos] PRIMARY KEY ([TenantId], [Variant]),
+        CONSTRAINT [FK_TenantLogos_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [tenancy].[Tenants] ([Id]) ON DELETE CASCADE
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [tenancy].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260919230142_AddTenantLogos'
+)
+BEGIN
+    INSERT INTO [tenancy].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260919230142_AddTenantLogos', N'9.0.2');
+END;
+
 COMMIT;
 GO
 

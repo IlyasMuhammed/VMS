@@ -5,8 +5,12 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "prestart": "node scripts/check-no-hardcoded-colors.mjs",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development"
+    "prebuild": "node scripts/check-no-hardcoded-colors.mjs",
+    "watch": "ng build --watch --configuration development",
+    "check:colors": "node scripts/check-no-hardcoded-colors.mjs",
+    "check:contrast": "node scripts/check-theme-contrast.mjs"
   },
   "dependencies": {
     "@angular/animations": "^19.2.0",
@@ -17,6 +21,8 @@
     "@angular/platform-browser": "^19.2.0",
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "@primeng/themes": "^19.1.4",
     "primeicons": "^7.0.0",
     "primeng": "^19.1.4",

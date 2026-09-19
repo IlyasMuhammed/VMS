@@ -23,6 +23,23 @@ internal class Tenant
 }
 
 /// <summary>
+/// A tenant's logo for one appearance mode. <see cref="Variant"/> is <c>light</c> (drawn to sit on a
+/// light background, i.e. a dark logo) or <c>dark</c> (drawn for a dark background). Kept in its own
+/// table so tenant list queries never drag image bytes along.
+/// </summary>
+internal class TenantLogo
+{
+    public Guid TenantId { get; set; }
+    public string Variant { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public byte[] Content { get; set; } = [];
+    /// <summary>Short content hash. Used as the ETag and lets clients know when to refetch.</summary>
+    public string Version { get; set; } = string.Empty;
+    public DateTime UpdatedAt { get; set; }
+    public int UpdatedBy { get; set; }
+}
+
+/// <summary>
 /// The authoritative record of platform Super Admins. Deliberately has no TenantId — Super Admin is
 /// outside tenant scope by definition. UserId is a plain int with no cross-schema foreign key
 /// (Tenancy and Auth are separate modules that share a database, not a constraint).

@@ -1,11 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="a" data-mode="light">
 <head>
   <meta charset="utf-8">
   <title>VMS — Vehicle Management System</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <script>
+    // Applies the saved theme and mode before Angular starts, so the page never flashes the wrong
+    // one. Keep the storage key and the allowed values in sync with src/app/core/theme/theme.model.ts.
+    (function () {
+      var theme = 'a';
+      var mode = 'system';
+      try {
+        var saved = JSON.parse(localStorage.getItem('vms.theme') || 'null');
+        if (saved && (saved.theme === 'a' || saved.theme === 'b')) theme = saved.theme;
+        if (saved && (saved.mode === 'light' || saved.mode === 'dark' || saved.mode === 'system')) mode = saved.mode;
+      } catch (e) {}
+      var dark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var root = document.documentElement;
+      root.setAttribute('data-theme', theme);
+      root.setAttribute('data-mode', dark ? 'dark' : 'light');
+    })();
+  </script>
 </head>
 <body>
   <app-root></app-root>

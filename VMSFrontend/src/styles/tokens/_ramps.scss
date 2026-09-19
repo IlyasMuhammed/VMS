@@ -1,0 +1,7 @@
+// Emits one CSS custom property per step of a colour ramp:
+//   @include ramp('primary', $blue)  ->  --vms-primary-50 ... --vms-primary-950
+@mixin ramp($prefix, $map) {
+  @each $step, $value in $map {
+    --vms-#{$prefix}-#{$step}: #{$value};
+  }
+}

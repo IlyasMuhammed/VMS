@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using VMS.Modules.Tenancy.Models;
 using VMS.Modules.Tenancy.Services;
 using VMS.Shared.Authorization;
+using VMS.Shared.Exceptions;
 using VMS.Shared.Pagination;
 
 namespace VMS.Modules.Tenancy.Controllers;
@@ -38,6 +40,36 @@ public class TenantsController(ITenantService tenants) : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTenantRequest request) =>
         await tenants.UpdateTenantAsync(id, request, User.GetUserId())
             ? Ok(ApiResponse.Ok("Tenant updated."))
+            : NotFound(ApiResponse.Fail("Tenant not found."));
+
+    /// <summary>Uploads the tenant's logo for one mode. <c>variant</c> is <c>light</c> or <c>dark</c>; PNG, JPEG or WebP, up to 512 KB.</summary>
+    [HttpPut("{id:guid}/logos/{variant}")]
+    // A hard ceiling for the request as a whole. It is deliberately above the 512 KB logo limit so an
+    // oversized logo reaches the check below and gets a readable message instead of a framework error.
+    [RequestSizeLimit(2 * 1024 * 1024)]
+    public async Task<IActionResult> UploadLogo(Guid id, string variant, IFormFile file)
+    {
+        if (file.Length > TenantLogoRules.MaxBytes)
+            throw new BadRequestException($"The logo must be {TenantLogoRules.MaxBytes / 1024} KB or smaller.");
+
+        await using var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer);
+        return await tenants.SetLogoAsync(id, variant, buffer.ToArray(), User.GetUserId())
+            ? Ok(ApiResponse.Ok("Logo saved."))
+            : NotFound(ApiResponse.Fail("Tenant not found."));
+    }
+
+    [HttpGet("{id:guid}/logos/{variant}")]
+    public async Task<IActionResult> GetLogo(Guid id, string variant)
+    {
+        var logo = await tenants.GetLogoAsync(id, variant);
+        return logo is null ? NotFound(ApiResponse.Fail("No logo uploaded.")) : this.LogoResult(logo);
+    }
+
+    [HttpDelete("{id:guid}/logos/{variant}")]
+    public async Task<IActionResult> DeleteLogo(Guid id, string variant) =>
+        await tenants.DeleteLogoAsync(id, variant)
+            ? Ok(ApiResponse.Ok("Logo removed."))
             : NotFound(ApiResponse.Fail("Tenant not found."));
 
     [HttpPatch("{id:guid}/status")]

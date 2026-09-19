@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
@@ -7,14 +7,18 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TableLazyLoadEvent, TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
+import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { TenantsApi } from '../../core/api.services';
 import { errorMessage } from '../../core/api-error';
-import { TenantListItem } from '../../core/models';
+import { LogoVariant, TenantListItem } from '../../core/models';
+import { LogoUploadComponent } from './logo-upload.component';
+
+const VARIANTS: readonly LogoVariant[] = ['light', 'dark'];
 
 @Component({
   selector: 'app-tenants',
   standalone: true,
-  imports: [DatePipe, FormsModule, ReactiveFormsModule, TableModule, ButtonModule, DialogModule, InputTextModule, TagModule],
+  imports: [DatePipe, FormsModule, ReactiveFormsModule, TableModule, ButtonModule, DialogModule, InputTextModule, TagModule, LogoUploadComponent],
   template: `
     <div class="page">
       <div class="page-header">
@@ -52,7 +56,7 @@ import { TenantListItem } from '../../core/models';
       </div>
     </div>
 
-    <p-dialog header="New tenant" [(visible)]="createVisible" [modal]="true" [style]="{ width: '640px' }">
+    <p-dialog header="New tenant" [(visible)]="createVisible" [modal]="true" [style]="{ width: '680px' }">
       <form [formGroup]="createForm" class="form-grid">
         <div class="field"><label>Tenant code *</label><input pInputText formControlName="tenantCode" style="text-transform: uppercase" /><span class="hint">Letters, digits, hyphens.</span></div>
         <div class="field"><label>Tenant name *</label><input pInputText formControlName="tenantName" /></div>
@@ -61,6 +65,11 @@ import { TenantListItem } from '../../core/models';
         <div class="field"><label>Country</label><input pInputText formControlName="country" /></div>
         <div class="field"><label>Time zone</label><input pInputText formControlName="timeZone" placeholder="e.g. Asia/Kolkata" /></div>
         <div class="field full"><label>Address</label><input pInputText formControlName="address" /></div>
+
+        <div class="full"><h3>Branding</h3><span class="muted">Optional. The logo appears next to the tenant name. Add one for each appearance mode; PNG, JPEG or WebP, up to 512 KB.</span></div>
+        <app-logo-upload variant="light" label="Logo for light mode" hint="Shown on light backgrounds. Use a dark logo." [(file)]="newLogo.light" />
+        <app-logo-upload variant="dark" label="Logo for dark mode" hint="Shown on dark backgrounds. Use a light logo." [(file)]="newLogo.dark" />
+
         <div class="full"><h3>First administrator</h3><span class="muted">Invited by email to set their own password.</span></div>
         <div class="field"><label>First name *</label><input pInputText formControlName="adminFirstName" /></div>
         <div class="field"><label>Last name</label><input pInputText formControlName="adminLastName" /></div>
@@ -72,7 +81,7 @@ import { TenantListItem } from '../../core/models';
       </ng-template>
     </p-dialog>
 
-    <p-dialog header="Edit tenant" [(visible)]="editVisible" [modal]="true" [style]="{ width: '560px' }">
+    <p-dialog header="Edit tenant" [(visible)]="editVisible" [modal]="true" [style]="{ width: '640px' }" (onHide)="releaseEditLogos()">
       <form [formGroup]="editForm" class="form-grid">
         <div class="field full"><label>Tenant name *</label><input pInputText formControlName="tenantName" /></div>
         <div class="field"><label>Contact email</label><input pInputText type="email" formControlName="contactEmail" /></div>
@@ -80,6 +89,10 @@ import { TenantListItem } from '../../core/models';
         <div class="field"><label>Country</label><input pInputText formControlName="country" /></div>
         <div class="field"><label>Time zone</label><input pInputText formControlName="timeZone" /></div>
         <div class="field full"><label>Address</label><input pInputText formControlName="address" /></div>
+
+        <div class="full"><h3>Branding</h3><span class="muted">Replace or remove a logo, then save.</span></div>
+        <app-logo-upload variant="light" label="Logo for light mode" hint="Shown on light backgrounds. Use a dark logo." [currentUrl]="editLogo.url.light()" [(file)]="editLogo.file.light" [(removed)]="editLogo.removed.light" />
+        <app-logo-upload variant="dark" label="Logo for dark mode" hint="Shown on dark backgrounds. Use a light logo." [currentUrl]="editLogo.url.dark()" [(file)]="editLogo.file.dark" [(removed)]="editLogo.removed.dark" />
       </form>
       <ng-template pTemplate="footer">
         <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="editVisible = false" />
@@ -97,7 +110,7 @@ import { TenantListItem } from '../../core/models';
     </p-dialog>
   `,
 })
-export class TenantsComponent {
+export class TenantsComponent implements OnDestroy {
   private readonly api = inject(TenantsApi);
   private readonly fb = inject(FormBuilder);
   private readonly toast = inject(MessageService);
@@ -108,6 +121,16 @@ export class TenantsComponent {
   readonly loading = signal(false);
   readonly busy = signal(false);
   readonly link = signal('');
+
+  /** Files chosen in the New tenant dialog. Sent right after the tenant is created. */
+  readonly newLogo = { light: signal<File | null>(null), dark: signal<File | null>(null) };
+
+  /** State of the two logo tiles in the Edit tenant dialog. */
+  readonly editLogo = {
+    url: { light: signal<string | null>(null), dark: signal<string | null>(null) },
+    file: { light: signal<File | null>(null), dark: signal<File | null>(null) },
+    removed: { light: signal(false), dark: signal(false) },
+  };
 
   search = '';
   page = 1;
@@ -139,6 +162,10 @@ export class TenantsComponent {
     address: [''],
   });
 
+  ngOnDestroy(): void {
+    this.releaseEditLogos();
+  }
+
   onLazy(e: TableLazyLoadEvent): void {
     this.pageSize = e.rows ?? this.pageSize;
     this.page = Math.floor((e.first ?? 0) / this.pageSize) + 1;
@@ -167,25 +194,33 @@ export class TenantsComponent {
 
   openCreate(): void {
     this.createForm.reset();
+    this.newLogo.light.set(null);
+    this.newLogo.dark.set(null);
     this.createVisible = true;
   }
 
   create(): void {
     if (this.createForm.invalid || this.busy()) return;
     this.busy.set(true);
-    this.api.create(this.createForm.getRawValue()).subscribe({
-      next: (r) => {
-        this.busy.set(false);
-        this.createVisible = false;
-        this.link.set(r.adminInviteLink);
-        this.linkVisible = true;
-        this.load();
-      },
-      error: (err) => {
-        this.busy.set(false);
-        this.fail(err);
-      },
-    });
+    const files: Record<LogoVariant, File | null> = { light: this.newLogo.light(), dark: this.newLogo.dark() };
+
+    this.api
+      .create(this.createForm.getRawValue())
+      .pipe(switchMap((r) => this.uploadLogos(r.tenantId, files).pipe(map((failed) => ({ r, failed })))))
+      .subscribe({
+        next: ({ r, failed }) => {
+          this.busy.set(false);
+          this.createVisible = false;
+          this.link.set(r.adminInviteLink);
+          this.linkVisible = true;
+          if (failed.length) this.warnLogos(failed);
+          this.load();
+        },
+        error: (err) => {
+          this.busy.set(false);
+          this.fail(err);
+        },
+      });
   }
 
   openEdit(t: TenantListItem): void {
@@ -200,7 +235,19 @@ export class TenantsComponent {
           timeZone: d.timeZone ?? '',
           address: d.address ?? '',
         });
+        this.releaseEditLogos();
         this.editVisible = true;
+
+        const versions: Record<LogoVariant, string | null | undefined> = { light: d.logoLightVersion, dark: d.logoDarkVersion };
+        for (const v of VARIANTS) {
+          if (!versions[v]) continue;
+          this.api
+            .logo(d.id, v)
+            .pipe(catchError(() => of(null)))
+            .subscribe((blob) => {
+              if (blob && this.editVisible && this.editId === d.id) this.editLogo.url[v].set(URL.createObjectURL(blob));
+            });
+        }
       },
       error: (err) => this.fail(err),
     });
@@ -209,18 +256,35 @@ export class TenantsComponent {
   saveEdit(): void {
     if (this.editForm.invalid || this.busy()) return;
     this.busy.set(true);
-    this.api.update(this.editId, this.editForm.getRawValue()).subscribe({
-      next: () => {
-        this.busy.set(false);
-        this.editVisible = false;
-        this.ok('Tenant updated');
-        this.load();
-      },
-      error: (err) => {
-        this.busy.set(false);
-        this.fail(err);
-      },
-    });
+    const id = this.editId;
+
+    this.api
+      .update(id, this.editForm.getRawValue())
+      .pipe(switchMap(() => this.applyLogoChanges(id)))
+      .subscribe({
+        next: (failed) => {
+          this.busy.set(false);
+          this.editVisible = false;
+          if (failed.length) this.warnLogos(failed, 'Tenant details saved');
+          else this.ok('Tenant updated');
+          this.load();
+        },
+        error: (err) => {
+          this.busy.set(false);
+          this.fail(err);
+        },
+      });
+  }
+
+  /** Frees the preview blobs and clears the tiles. Runs when the edit dialog closes. */
+  releaseEditLogos(): void {
+    for (const v of VARIANTS) {
+      const url = this.editLogo.url[v]();
+      if (url) URL.revokeObjectURL(url);
+      this.editLogo.url[v].set(null);
+      this.editLogo.file[v].set(null);
+      this.editLogo.removed[v].set(false);
+    }
   }
 
   toggle(t: TenantListItem): void {
@@ -244,6 +308,37 @@ export class TenantsComponent {
 
   copy(): void {
     navigator.clipboard?.writeText(this.link()).then(() => this.ok('Link copied'));
+  }
+
+  /** Uploads whichever logos were chosen. Never throws: it returns a message per logo that failed. */
+  private uploadLogos(id: string, files: Record<LogoVariant, File | null>): Observable<string[]> {
+    const jobs = VARIANTS.filter((v) => files[v]).map((v) =>
+      this.api.uploadLogo(id, v, files[v]!).pipe(
+        map(() => ''),
+        catchError((err) => of(`The ${v}-mode logo was not saved: ${errorMessage(err)}`)),
+      ),
+    );
+    return jobs.length ? forkJoin(jobs).pipe(map((r) => r.filter(Boolean))) : of([]);
+  }
+
+  /** Applies the Edit dialog's logo choices: upload a new file, or delete the existing one. */
+  private applyLogoChanges(id: string): Observable<string[]> {
+    const jobs = VARIANTS.flatMap((v) => {
+      const file = this.editLogo.file[v]();
+      if (file) return [this.api.uploadLogo(id, v, file)];
+      if (this.editLogo.removed[v]()) return [this.api.removeLogo(id, v)];
+      return [];
+    }).map((job, i) =>
+      job.pipe(
+        map(() => ''),
+        catchError((err) => of(`A logo change was not saved: ${errorMessage(err)}`)),
+      ),
+    );
+    return jobs.length ? forkJoin(jobs).pipe(map((r) => r.filter(Boolean))) : of([]);
+  }
+
+  private warnLogos(failed: string[], summary = 'Tenant created'): void {
+    this.toast.add({ severity: 'warn', summary, detail: `${failed.join(' ')} You can add logos from Edit tenant.`, life: 9000 });
   }
 
   private ok(detail: string): void {

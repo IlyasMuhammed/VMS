@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Tenancy.Data;
@@ -65,7 +66,13 @@ internal sealed partial class TenantService(
                 Country = t.Country,
                 TimeZone = t.TimeZone,
                 CreatedDate = t.CreatedDate,
-                ModifiedDate = t.ModifiedDate
+                ModifiedDate = t.ModifiedDate,
+                LogoLightVersion = db.TenantLogos
+                    .Where(l => l.TenantId == t.Id && l.Variant == TenantLogoRules.Light)
+                    .Select(l => l.Version).FirstOrDefault(),
+                LogoDarkVersion = db.TenantLogos
+                    .Where(l => l.TenantId == t.Id && l.Variant == TenantLogoRules.Dark)
+                    .Select(l => l.Version).FirstOrDefault()
             })
             .FirstOrDefaultAsync();
 
@@ -158,6 +165,51 @@ internal sealed partial class TenantService(
         if (!isActive)
             await users.RevokeSessionsForTenantAsync(id);
 
+        return true;
+    }
+
+    public async Task<bool> SetLogoAsync(Guid tenantId, string variant, byte[] content, int updatedBy)
+    {
+        variant = TenantLogoRules.NormaliseVariant(variant);
+        if (content.Length == 0)
+            throw new BadRequestException("The logo file is empty.");
+        if (content.Length > TenantLogoRules.MaxBytes)
+            throw new BadRequestException($"The logo must be {TenantLogoRules.MaxBytes / 1024} KB or smaller.");
+        var contentType = TenantLogoRules.DetectContentType(content)
+            ?? throw new BadRequestException("The logo must be a PNG, JPEG or WebP image.");
+
+        if (!await db.Tenants.AnyAsync(t => t.Id == tenantId)) return false;
+
+        var logo = await db.TenantLogos.FirstOrDefaultAsync(l => l.TenantId == tenantId && l.Variant == variant);
+        if (logo is null)
+        {
+            logo = new TenantLogo { TenantId = tenantId, Variant = variant };
+            db.TenantLogos.Add(logo);
+        }
+        logo.ContentType = contentType;
+        logo.Content = content;
+        logo.Version = Convert.ToHexString(SHA256.HashData(content))[..16].ToLowerInvariant();
+        logo.UpdatedAt = DateTime.UtcNow;
+        logo.UpdatedBy = updatedBy;
+        await db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<TenantLogoFile?> GetLogoAsync(Guid tenantId, string variant)
+    {
+        variant = TenantLogoRules.NormaliseVariant(variant);
+        return await db.TenantLogos.AsNoTracking()
+            .Where(l => l.TenantId == tenantId && l.Variant == variant)
+            .Select(l => new TenantLogoFile(l.Content, l.ContentType, l.Version))
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<bool> DeleteLogoAsync(Guid tenantId, string variant)
+    {
+        variant = TenantLogoRules.NormaliseVariant(variant);
+        if (!await db.Tenants.AnyAsync(t => t.Id == tenantId)) return false;
+
+        await db.TenantLogos.Where(l => l.TenantId == tenantId && l.Variant == variant).ExecuteDeleteAsync();
         return true;
     }
 }

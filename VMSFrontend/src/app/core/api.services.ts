@@ -9,6 +9,7 @@ import {
   CreateTenantResult,
   CreateUserRequest,
   CurrentUser,
+  LogoVariant,
   Paged,
   PatchUserRequest,
   PermissionGroup,
@@ -133,6 +134,27 @@ export class TenantsApi {
 
   setStatus(id: string, isActive: boolean): Observable<unknown> {
     return this.http.patch(`${api}/system/tenants/${id}/status`, { isActive });
+  }
+
+  /** Stores or replaces one of a tenant's logos (Super Admin). PNG, JPEG or WebP, up to 512 KB. */
+  uploadLogo(id: string, variant: LogoVariant, file: File): Observable<unknown> {
+    const body = new FormData();
+    body.append('file', file, file.name);
+    return this.http.put(`${api}/system/tenants/${id}/logos/${variant}`, body);
+  }
+
+  removeLogo(id: string, variant: LogoVariant): Observable<unknown> {
+    return this.http.delete(`${api}/system/tenants/${id}/logos/${variant}`);
+  }
+
+  /** A tenant's logo as an image (Super Admin). 404 when none is uploaded. */
+  logo(id: string, variant: LogoVariant): Observable<Blob> {
+    return this.http.get(`${api}/system/tenants/${id}/logos/${variant}`, { responseType: 'blob' });
+  }
+
+  /** The signed-in user's own tenant logo. Fetched with the bearer token, so it is never a public URL. */
+  currentLogo(variant: LogoVariant): Observable<Blob> {
+    return this.http.get(`${api}/tenant/logos/${variant}`, { responseType: 'blob' });
   }
 }
 

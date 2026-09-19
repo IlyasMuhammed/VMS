@@ -19,4 +19,12 @@ public class CurrentTenantController(ITenantService tenants) : ControllerBase
             ? NotFound(ApiResponse.Fail("Tenant not found."))
             : Ok(ApiResponse<TenantDetailModel>.Ok(tenant));
     }
+
+    /// <summary>The signed-in user's tenant logo for one mode (<c>light</c> or <c>dark</c>). 404 when none is uploaded.</summary>
+    [HttpGet("logos/{variant}")]
+    public async Task<IActionResult> GetLogo(string variant)
+    {
+        var logo = await tenants.GetLogoAsync(User.GetTenantId(), variant);
+        return logo is null ? NotFound(ApiResponse.Fail("No logo uploaded.")) : this.LogoResult(logo);
+    }
 }

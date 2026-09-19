@@ -143,11 +143,17 @@ export interface TenantListItem {
   createdDate: string;
 }
 
+/** Which appearance mode a logo is for. A "light" logo sits on light backgrounds, a "dark" one on dark. */
+export type LogoVariant = 'light' | 'dark';
+
 export interface TenantDetail extends TenantListItem {
   contactPhone?: string;
   address?: string;
   country?: string;
   timeZone?: string;
+  /** Content hash of the uploaded logo, or null/absent when there is none. */
+  logoLightVersion?: string | null;
+  logoDarkVersion?: string | null;
 }
 
 export interface CreateTenantRequest {

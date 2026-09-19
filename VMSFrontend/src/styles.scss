@@ -1,16 +1,8 @@
-@import 'primeicons/primeicons.css';
-
-:root {
-  --vms-bg: #f4f6fa;
-  --vms-surface: #ffffff;
-  --vms-border: #e3e8ef;
-  --vms-text: #1f2a44;
-  --vms-muted: #6b778c;
-  --vms-brand: #1d4ed8;
-  --vms-brand-dark: #14338f;
-  --vms-sidebar: #0f1b3d;
-  --vms-danger: #c62828;
-}
+// Theme tokens. Colour literals live ONLY in src/styles/tokens/. Everything below (and every
+// component) uses var(--vms-*). See the "Theming" section of the project README.
+@use './styles/tokens/shared';
+@use './styles/tokens/theme-a';
+@use './styles/tokens/theme-b';
 
 * { box-sizing: border-box; }
 
@@ -19,11 +11,18 @@ html, body {
   min-height: 100%;
   background: var(--vms-bg);
   color: var(--vms-text);
-  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  font-family: var(--vms-font);
   font-size: 14px;
 }
 
 h1, h2, h3 { margin: 0; }
+
+a { color: var(--vms-brand-text); }
+
+:focus-visible {
+  outline: 2px solid var(--vms-focus-ring);
+  outline-offset: 2px;
+}
 
 .page { padding: 1.5rem 2rem; }
 
@@ -42,7 +41,7 @@ h1, h2, h3 { margin: 0; }
 .card {
   background: var(--vms-surface);
   border: 1px solid var(--vms-border);
-  border-radius: 10px;
+  border-radius: var(--vms-radius);
   padding: 1.25rem;
 }
 
@@ -74,12 +73,31 @@ h1, h2, h3 { margin: 0; }
 }
 
 .alert {
-  border-radius: 8px;
+  border-radius: var(--vms-radius-sm);
   padding: .75rem 1rem;
   font-size: .9rem;
-  &.error { background: #fdecea; color: #7f1d1d; border: 1px solid #f5c2c0; }
-  &.info { background: #e8f0fe; color: #14338f; border: 1px solid #c3d4fb; }
-  &.success { background: #e6f4ea; color: #14532d; border: 1px solid #b7dfc2; }
+  &.error { background: var(--vms-danger-bg); color: var(--vms-danger-text); border: 1px solid var(--vms-danger-border); }
+  &.info { background: var(--vms-info-bg); color: var(--vms-info-text); border: 1px solid var(--vms-info-border); }
+  &.success { background: var(--vms-success-bg); color: var(--vms-success-text); border: 1px solid var(--vms-success-border); }
+  &.warning { background: var(--vms-warning-bg); color: var(--vms-warning-text); border: 1px solid var(--vms-warning-border); }
+}
+
+// Small status label: <span class="chip chip--success">Active</span>
+.chip {
+  display: inline-block;
+  padding: .125rem .65rem;
+  border-radius: var(--vms-radius-pill);
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--vms-neutral-bg);
+  color: var(--vms-neutral-text);
+
+  &--success { background: var(--vms-success-bg); color: var(--vms-success-text); }
+  &--warning { background: var(--vms-warning-bg); color: var(--vms-warning-text); }
+  &--danger { background: var(--vms-danger-bg); color: var(--vms-danger-text); }
+  &--info { background: var(--vms-info-bg); color: var(--vms-info-text); }
+  &--neutral { background: var(--vms-neutral-bg); color: var(--vms-neutral-text); }
 }
 
 .link-box {
@@ -91,6 +109,7 @@ h1, h2, h3 { margin: 0; }
 
 .actions { display: flex; gap: .25rem; justify-content: flex-end; }
 .muted { color: var(--vms-muted); }
+.mono { font-family: var(--vms-font-mono); }
 
 .auth-page {
   min-height: 100vh;
@@ -98,7 +117,7 @@ h1, h2, h3 { margin: 0; }
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: linear-gradient(135deg, #0f1b3d 0%, #1d4ed8 100%);
+  background: var(--vms-auth-gradient);
 }
 
 .auth-card {
@@ -117,9 +136,9 @@ h1, h2, h3 { margin: 0; }
   .logo {
     display: inline-block;
     background: var(--vms-brand);
-    color: #fff;
+    color: var(--vms-on-brand);
     font-weight: 700;
-    border-radius: 10px;
+    border-radius: var(--vms-radius-sm);
     padding: .4rem .7rem;
   }
   .center { text-align: center; font-size: .9rem; }

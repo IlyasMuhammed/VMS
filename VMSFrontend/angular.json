@@ -23,7 +23,15 @@
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [{ "glob": "**/*", "input": "public" }],
-            "styles": ["src/styles.scss"],
+            "styles": [
+              "node_modules/primeicons/primeicons.css",
+              "node_modules/@fontsource/ibm-plex-sans/latin-400.css",
+              "node_modules/@fontsource/ibm-plex-sans/latin-500.css",
+              "node_modules/@fontsource/ibm-plex-sans/latin-600.css",
+              "node_modules/@fontsource/ibm-plex-mono/latin-400.css",
+              "node_modules/@fontsource/ibm-plex-mono/latin-500.css",
+              "src/styles.scss"
+            ],
             "scripts": []
           },
           "configurations": {

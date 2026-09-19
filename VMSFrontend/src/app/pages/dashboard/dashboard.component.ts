@@ -11,7 +11,6 @@ import { AuthService } from '../../core/auth.service';
       <div class="page-header">
         <div>
           <h1>Welcome, {{ auth.user()?.firstName }}</h1>
-          <div class="sub">Signed in as {{ auth.user()?.role?.value }}</div>
         </div>
       </div>
 
@@ -33,7 +32,7 @@ import { AuthService } from '../../core/auth.service';
     `
       .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
       .tile { text-decoration: none; color: inherit; transition: box-shadow .15s; }
-      .tile:hover { box-shadow: 0 4px 14px rgba(15, 27, 61, .12); }
+      .tile:hover { box-shadow: var(--vms-shadow-md); }
       .tile i { font-size: 1.6rem; color: var(--vms-brand); }
       .tile h3 { margin: .6rem 0 .25rem; }
       .tile p { margin: 0; color: var(--vms-muted); }

@@ -25,7 +25,15 @@ public class TenantDetailModel : TenantListItemModel
     public string? Country { get; set; }
     public string? TimeZone { get; set; }
     public DateTime? ModifiedDate { get; set; }
+
+    /// <summary>Version (content hash) of the logo for light mode, or null when none is uploaded.</summary>
+    public string? LogoLightVersion { get; set; }
+    /// <summary>Version (content hash) of the logo for dark mode, or null when none is uploaded.</summary>
+    public string? LogoDarkVersion { get; set; }
 }
+
+/// <summary>A stored logo, ready to be streamed back.</summary>
+public sealed record TenantLogoFile(byte[] Content, string ContentType, string Version);
 
 public class CreateTenantRequest
 {

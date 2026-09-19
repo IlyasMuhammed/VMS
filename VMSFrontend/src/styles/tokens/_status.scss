@@ -1,0 +1,52 @@
+// Status colours (success, warning, danger, info, neutral), shared by every theme.
+// Each theme's light and dark block includes the matching mixin below. They only pick steps
+// from the ramps, so they hold no colour literals of their own.
+//
+//   --vms-<status>         solid colour for text or icons on a surface
+//   --vms-<status>-bg      tinted fill (chips, alerts)
+//   --vms-<status>-text    text on that fill
+//   --vms-<status>-border  outline on that fill
+
+@mixin light {
+  --vms-success: var(--vms-green-700);
+  --vms-warning: var(--vms-amber-700);
+  --vms-danger: var(--vms-red-700);
+
+  --vms-success-bg: var(--vms-green-100);
+  --vms-success-text: var(--vms-green-800);
+  --vms-success-border: var(--vms-green-200);
+  --vms-warning-bg: var(--vms-amber-100);
+  --vms-warning-text: var(--vms-amber-900);
+  --vms-warning-border: var(--vms-amber-200);
+  --vms-danger-bg: var(--vms-red-100);
+  --vms-danger-text: var(--vms-red-800);
+  --vms-danger-border: var(--vms-red-200);
+  --vms-info-bg: var(--vms-blue-100);
+  --vms-info-text: var(--vms-blue-800);
+  --vms-info-border: var(--vms-blue-200);
+  --vms-neutral-bg: var(--vms-neutral-100);
+  --vms-neutral-text: var(--vms-neutral-700);
+  --vms-neutral-border: var(--vms-neutral-200);
+}
+
+@mixin dark {
+  --vms-success: var(--vms-green-400);
+  --vms-warning: var(--vms-amber-400);
+  --vms-danger: var(--vms-red-400);
+
+  --vms-success-bg: color-mix(in srgb, var(--vms-green-400) 16%, transparent);
+  --vms-success-text: var(--vms-green-300);
+  --vms-success-border: color-mix(in srgb, var(--vms-green-400) 34%, transparent);
+  --vms-warning-bg: color-mix(in srgb, var(--vms-amber-400) 16%, transparent);
+  --vms-warning-text: var(--vms-amber-300);
+  --vms-warning-border: color-mix(in srgb, var(--vms-amber-400) 34%, transparent);
+  --vms-danger-bg: color-mix(in srgb, var(--vms-red-400) 16%, transparent);
+  --vms-danger-text: var(--vms-red-300);
+  --vms-danger-border: color-mix(in srgb, var(--vms-red-400) 34%, transparent);
+  --vms-info-bg: color-mix(in srgb, var(--vms-blue-400) 16%, transparent);
+  --vms-info-text: var(--vms-blue-300);
+  --vms-info-border: color-mix(in srgb, var(--vms-blue-400) 34%, transparent);
+  --vms-neutral-bg: color-mix(in srgb, var(--vms-neutral-400) 16%, transparent);
+  --vms-neutral-text: var(--vms-neutral-300);
+  --vms-neutral-border: color-mix(in srgb, var(--vms-neutral-400) 34%, transparent);
+}

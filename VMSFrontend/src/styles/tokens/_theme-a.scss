@@ -1,0 +1,97 @@
+@use 'palettes' as p;
+@use 'ramps' as r;
+@use 'status';
+
+// THEME A "Console": cool slate neutrals, blue brand, sidebar navigation, softer corners.
+// Applies to any element carrying the attributes (not just <html>), so a small preview such as a
+// swatch can show this theme while the page uses another. The page itself is selected with
+// <html data-theme="a" data-mode="light|dark">.
+
+[data-theme='a'] {
+  // Ramps this theme is built from. Everything below picks steps from these.
+  @include r.ramp('neutral', p.$slate);
+  @include r.ramp('primary', p.$blue);
+
+  // Typography and shape.
+  --vms-font: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --vms-font-mono: ui-monospace, Consolas, monospace;
+  --vms-radius: 10px;
+  --vms-radius-sm: 6px;
+  --vms-radius-pill: 999px;
+}
+
+[data-theme='a'][data-mode='light'] {
+  color-scheme: light;
+
+  --vms-bg: var(--vms-neutral-100);
+  --vms-surface: var(--vms-neutral-0);
+  --vms-surface-soft: var(--vms-neutral-50);
+  --vms-border: var(--vms-neutral-200);
+  --vms-border-strong: var(--vms-neutral-300);
+  --vms-text: var(--vms-neutral-800);
+  --vms-muted: var(--vms-neutral-600);
+
+  --vms-brand: var(--vms-primary-700);
+  --vms-brand-hover: var(--vms-primary-800);
+  --vms-brand-active: var(--vms-primary-900);
+  --vms-on-brand: var(--vms-neutral-0);
+  --vms-brand-text: var(--vms-primary-700);
+  --vms-brand-tint: var(--vms-primary-50);
+  --vms-brand-tint-strong: var(--vms-primary-100);
+
+  --vms-chrome-bg: var(--vms-neutral-900);
+  --vms-chrome-strong: var(--vms-neutral-0);
+  --vms-chrome-text: var(--vms-neutral-300);
+  --vms-chrome-muted: var(--vms-neutral-400);
+  --vms-chrome-hover: color-mix(in srgb, var(--vms-neutral-0) 8%, transparent);
+  --vms-chrome-border: color-mix(in srgb, var(--vms-neutral-0) 10%, transparent);
+  --vms-chrome-active-bg: var(--vms-brand);
+  --vms-chrome-active-text: var(--vms-on-brand);
+  --vms-chrome-accent: var(--vms-primary-400);
+
+  --vms-overlay: color-mix(in srgb, var(--vms-neutral-900) 45%, transparent);
+  --vms-shadow-md: 0 4px 14px color-mix(in srgb, var(--vms-neutral-900) 14%, transparent);
+  --vms-shadow-lg: 0 16px 40px color-mix(in srgb, var(--vms-neutral-900) 22%, transparent);
+  --vms-focus-ring: var(--vms-brand);
+  --vms-auth-gradient: linear-gradient(135deg, var(--vms-neutral-900) 0%, var(--vms-primary-700) 100%);
+
+  @include status.light;
+}
+
+[data-theme='a'][data-mode='dark'] {
+  color-scheme: dark;
+
+  --vms-bg: var(--vms-neutral-950);
+  --vms-surface: var(--vms-neutral-900);
+  --vms-surface-soft: var(--vms-neutral-800);
+  --vms-border: var(--vms-neutral-700);
+  --vms-border-strong: var(--vms-neutral-600);
+  --vms-text: var(--vms-neutral-100);
+  --vms-muted: var(--vms-neutral-400);
+
+  --vms-brand: var(--vms-primary-400);
+  --vms-brand-hover: var(--vms-primary-300);
+  --vms-brand-active: var(--vms-primary-200);
+  --vms-on-brand: var(--vms-neutral-950);
+  --vms-brand-text: var(--vms-primary-300);
+  --vms-brand-tint: color-mix(in srgb, var(--vms-primary-400) 16%, transparent);
+  --vms-brand-tint-strong: color-mix(in srgb, var(--vms-primary-400) 26%, transparent);
+
+  --vms-chrome-bg: var(--vms-neutral-900);
+  --vms-chrome-strong: var(--vms-neutral-0);
+  --vms-chrome-text: var(--vms-neutral-300);
+  --vms-chrome-muted: var(--vms-neutral-400);
+  --vms-chrome-hover: color-mix(in srgb, var(--vms-neutral-0) 8%, transparent);
+  --vms-chrome-border: color-mix(in srgb, var(--vms-neutral-0) 10%, transparent);
+  --vms-chrome-active-bg: var(--vms-brand);
+  --vms-chrome-active-text: var(--vms-on-brand);
+  --vms-chrome-accent: var(--vms-brand);
+
+  --vms-overlay: color-mix(in srgb, var(--vms-neutral-950) 70%, transparent);
+  --vms-shadow-md: 0 4px 14px color-mix(in srgb, var(--vms-neutral-950) 55%, transparent);
+  --vms-shadow-lg: 0 16px 40px color-mix(in srgb, var(--vms-neutral-950) 70%, transparent);
+  --vms-focus-ring: var(--vms-brand);
+  --vms-auth-gradient: linear-gradient(135deg, var(--vms-neutral-950) 0%, var(--vms-primary-900) 100%);
+
+  @include status.dark;
+}

@@ -8,6 +8,7 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
     internal const string Schema = "tenancy";
 
     internal DbSet<Tenant> Tenants => Set<Tenant>();
+    internal DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
     internal DbSet<SuperAdminUser> SuperAdminUsers => Set<SuperAdminUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -28,6 +29,17 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             b.Property(x => x.Address).HasMaxLength(500);
             b.Property(x => x.Country).HasMaxLength(100);
             b.Property(x => x.TimeZone).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<TenantLogo>(b =>
+        {
+            b.ToTable("TenantLogos");
+            b.HasKey(x => new { x.TenantId, x.Variant });
+            b.Property(x => x.Variant).HasMaxLength(5).IsRequired();
+            b.Property(x => x.ContentType).HasMaxLength(50).IsRequired();
+            b.Property(x => x.Content).HasColumnType("varbinary(max)").IsRequired();
+            b.Property(x => x.Version).HasMaxLength(64).IsRequired();
+            b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SuperAdminUser>(b =>

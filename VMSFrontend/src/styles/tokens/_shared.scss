@@ -1,0 +1,15 @@
+@use 'palettes' as p;
+@use 'ramps' as r;
+
+// Status ramps are the same in every theme and mode. PrimeNG's severities also read from
+// these (see src/app/core/theme/vms-preset.ts), so buttons, tags and toasts follow the theme.
+:root {
+  @include r.ramp('red', p.$red);
+  @include r.ramp('orange', p.$orange);
+  @include r.ramp('amber', p.$amber);
+  @include r.ramp('yellow', p.$yellow);
+  @include r.ramp('green', p.$green);
+  @include r.ramp('sky', p.$sky);
+  @include r.ramp('blue', p.$blue);
+  @include r.ramp('purple', p.$purple);
+}
