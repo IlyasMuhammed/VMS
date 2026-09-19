@@ -1,9 +1,0 @@
-namespace SMS.Modules.Auth.Services;
-
-internal interface IEmailService
-{
-    void SendActivationEmail(string email, string name, string token);
-    void SendPasswordResetEmail(string email, string code);
-    void SendTemporaryPasswordEmail(string email, string name, string tempPassword);
-    void SendOrgAdminInviteEmail(string email, string name, string orgName, string token);
-}

@@ -1,9 +1,0 @@
-using SMS.Modules.Auth.Domain;
-
-namespace SMS.Modules.Auth.Services;
-
-internal interface ITokenService
-{
-    string GenerateAccessToken(UserAccount user, string roleName, IList<string> allowedPermissions, bool isSuperAdmin);
-    (string raw, string hash) GenerateRefreshToken();
-}

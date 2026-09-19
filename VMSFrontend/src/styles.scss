@@ -1,0 +1,126 @@
+@import 'primeicons/primeicons.css';
+
+:root {
+  --vms-bg: #f4f6fa;
+  --vms-surface: #ffffff;
+  --vms-border: #e3e8ef;
+  --vms-text: #1f2a44;
+  --vms-muted: #6b778c;
+  --vms-brand: #1d4ed8;
+  --vms-brand-dark: #14338f;
+  --vms-sidebar: #0f1b3d;
+  --vms-danger: #c62828;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--vms-bg);
+  color: var(--vms-text);
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  font-size: 14px;
+}
+
+h1, h2, h3 { margin: 0; }
+
+.page { padding: 1.5rem 2rem; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+
+  h1 { font-size: 1.5rem; font-weight: 600; }
+  .sub { color: var(--vms-muted); margin-top: .25rem; }
+}
+
+.card {
+  background: var(--vms-surface);
+  border: 1px solid var(--vms-border);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+
+  .full { grid-column: 1 / -1; }
+  @media (max-width: 600px) { grid-template-columns: 1fr; }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+
+  label { font-weight: 600; font-size: .85rem; }
+  .error { color: var(--vms-danger); font-size: .8rem; }
+  .hint { color: var(--vms-muted); font-size: .8rem; }
+}
+
+.alert {
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  font-size: .9rem;
+  &.error { background: #fdecea; color: #7f1d1d; border: 1px solid #f5c2c0; }
+  &.info { background: #e8f0fe; color: #14338f; border: 1px solid #c3d4fb; }
+  &.success { background: #e6f4ea; color: #14532d; border: 1px solid #b7dfc2; }
+}
+
+.link-box {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  input { flex: 1; }
+}
+
+.actions { display: flex; gap: .25rem; justify-content: flex-end; }
+.muted { color: var(--vms-muted); }
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #0f1b3d 0%, #1d4ed8 100%);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2rem;
+
+  .auth-brand {
+    text-align: center;
+    h1 { font-size: 1.4rem; margin: .5rem 0 .15rem; }
+    p { margin: 0; }
+  }
+  .logo {
+    display: inline-block;
+    background: var(--vms-brand);
+    color: #fff;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: .4rem .7rem;
+  }
+  .center { text-align: center; font-size: .9rem; }
+}

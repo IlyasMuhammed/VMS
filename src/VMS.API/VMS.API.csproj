@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>VMS.API</RootNamespace>
+    <AssemblyName>VMS.API</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VMS.Shared\VMS.Shared.csproj" />
+    <ProjectReference Include="..\VMS.Modules.Auth\VMS.Modules.Auth.csproj" />
+    <ProjectReference Include="..\VMS.Modules.Tenancy\VMS.Modules.Tenancy.csproj" />
+  </ItemGroup>
+
+</Project>
