@@ -19,7 +19,7 @@ internal sealed class TokenService(IOptions<AppSettings> settings) : ITokenServi
     /// </summary>
     internal const int AccessTokenSeconds = AccessTokenMinutes * 60;
 
-    public string GenerateAccessToken(UserAccount user, string roleName, IReadOnlyCollection<string> permissions, bool isSuperAdmin)
+    public string GenerateAccessToken(UserAccount user, string roleName, IReadOnlyCollection<string> permissions, bool isSuperAdmin, string scopeType, Guid? scopeBranchId)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Value.Secret));
         var claims = new List<Claim>
@@ -28,9 +28,15 @@ internal sealed class TokenService(IOptions<AppSettings> settings) : ITokenServi
             new(JwtRegisteredClaimNames.Email, user.Email),
             new("roleId", user.RoleID.ToString()),
             new("roleName", roleName),
+            // Shown in the audit trail and the access-denial log next to the user id.
+            new("user_name", string.Join(' ', new[] { user.FirstName, user.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)))),
             new("tenantId", user.TenantId.ToString()),
             new("is_super_admin", isSuperAdmin ? "true" : "false"),
+            // §23B.4: the widest scope across every role the user holds. Read by ICallerScope, not by this module.
+            new("scope", scopeType),
         };
+        if (scopeBranchId is { } branch) claims.Add(new Claim("scopeBranchId", branch.ToString()));
+        if (user.LinkedPartnerId is { } partnerId) claims.Add(new Claim("linkedPartnerId", partnerId.ToString()));
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));
 
         var descriptor = new SecurityTokenDescriptor

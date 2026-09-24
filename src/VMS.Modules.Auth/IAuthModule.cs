@@ -6,7 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using VMS.Modules.Auth.Data;
 using VMS.Modules.Auth.Domain;
 using VMS.Modules.Auth.Services;
+using VMS.Shared.Authorization;
 using VMS.Shared.Common;
+using VMS.Shared.Users;
 
 namespace VMS.Modules.Auth;
 
@@ -35,6 +37,8 @@ public static class AuthModuleExtensions
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<ITenantUserProvisioningService, TenantUserProvisioningService>();
         services.AddScoped<AuthDataSeeder>();
+        services.AddScoped<IAccessDenialSink, EfAccessDenialSink>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
 
         return services;
     }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using VMS.Shared.Auditing;
 using VMS.Shared.Common;
 
 namespace VMS.Modules.Auth.Data;
@@ -14,6 +15,6 @@ internal sealed class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbC
                 sql.MigrationsHistoryTable("__EFMigrationsHistory", AuthDbContext.Schema))
             .Options;
 
-        return new AuthDbContext(options, new StaticTenantContext());
+        return new AuthDbContext(options, new StaticTenantContext(), NoAuditContext.Instance);
     }
 }

@@ -1,10 +1,14 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { Access, canAccess } from './access';
 import { AuthService } from './auth.service';
 
-export const authGuard: CanActivateFn = () => {
+/** Signed in, or off to the sign-in page with a note of where they were going, so they come back to it. */
+export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
-  return auth.isAuthenticated() ? true : inject(Router).createUrlTree(['/auth/login']);
+  if (auth.isAuthenticated()) return true;
+  const returnUrl = state.url && state.url !== '/' ? state.url : undefined;
+  return inject(Router).createUrlTree(['/auth/login'], returnUrl ? { queryParams: { returnUrl } } : {});
 };
 
 /** Login, forgot-password etc. are pointless once signed in — send the user home. */
@@ -15,14 +19,11 @@ export const guestGuard: CanActivateFn = (route) => {
   return auth.isAuthenticated() ? inject(Router).createUrlTree(['/']) : true;
 };
 
-export const permissionGuard =
-  (code: string): CanActivateFn =>
-  () => {
-    const auth = inject(AuthService);
-    return auth.hasPermission(code) ? true : inject(Router).createUrlTree(['/forbidden']);
-  };
-
-export const superAdminGuard: CanActivateFn = () => {
+/**
+ * Enforces the `data.access` a route declares (see `page()` in app.routes.ts). The same declaration builds
+ * the menu, so what is hidden and what is refused cannot disagree.
+ */
+export const accessGuard: CanActivateFn = (route) => {
   const auth = inject(AuthService);
-  return auth.isSuperAdmin() ? true : inject(Router).createUrlTree(['/forbidden']);
+  return canAccess(route.data['access'] as Access | undefined, auth.user()) ? true : inject(Router).createUrlTree(['/forbidden']);
 };

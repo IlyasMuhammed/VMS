@@ -23,6 +23,59 @@ namespace VMS.Modules.Auth.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("VMS.Modules.Auth.Domain.AccessDenialRecord", b =>
+                {
+                    b.Property<long>("AccessDenialID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AccessDenialID"));
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RouteValues")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("AccessDenialID");
+
+                    b.HasIndex("TenantId", "Permission", "OccurredAt");
+
+                    b.HasIndex("TenantId", "UserId", "OccurredAt");
+
+                    b.ToTable("AccessDenials", "auth");
+                });
+
             modelBuilder.Entity("VMS.Modules.Auth.Domain.Permission", b =>
                 {
                     b.Property<int>("PermissionID")
@@ -39,6 +92,13 @@ namespace VMS.Modules.Auth.Data.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)")
+                        .HasDefaultValue("Operation");
 
                     b.Property<string>("Module")
                         .IsRequired()
@@ -182,6 +242,9 @@ namespace VMS.Modules.Auth.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("LinkedPartnerId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("LockedUntil")
                         .HasColumnType("datetime2");
 
@@ -229,6 +292,45 @@ namespace VMS.Modules.Auth.Data.Migrations
                     b.ToTable("UserAccounts", "auth");
                 });
 
+            modelBuilder.Entity("VMS.Modules.Auth.Domain.UserRole", b =>
+                {
+                    b.Property<int>("UserRoleID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserRoleID"));
+
+                    b.Property<Guid?>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("RoleID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("AllBranches");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserRoleID");
+
+                    b.HasIndex("RoleID");
+
+                    b.HasIndex("TenantId", "RoleID");
+
+                    b.HasIndex("UserID", "RoleID")
+                        .IsUnique();
+
+                    b.ToTable("UserRoles", "auth");
+                });
+
             modelBuilder.Entity("VMS.Modules.Auth.Domain.UserSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -268,6 +370,93 @@ namespace VMS.Modules.Auth.Data.Migrations
                     b.ToTable("UserSessions", "auth");
                 });
 
+            modelBuilder.Entity("VMS.Shared.Auditing.AuditEntry", b =>
+                {
+                    b.Property<long>("AuditEntryID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AuditEntryID"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Entity")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Field")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RecordId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RequiredPermission")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RootEntity")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RootRecordId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("AuditEntryID");
+
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("TenantId", "OccurredAt");
+
+                    b.HasIndex("TenantId", "UserId", "OccurredAt");
+
+                    b.HasIndex("TenantId", "Entity", "RecordId", "OccurredAt");
+
+                    b.HasIndex("TenantId", "RootEntity", "RootRecordId", "OccurredAt");
+
+                    b.ToTable("AuditEntries", "core", t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
             modelBuilder.Entity("VMS.Modules.Auth.Domain.RolePermission", b =>
                 {
                     b.HasOne("VMS.Modules.Auth.Domain.Permission", null)
@@ -292,6 +481,21 @@ namespace VMS.Modules.Auth.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("VMS.Modules.Auth.Domain.UserRole", b =>
+                {
+                    b.HasOne("VMS.Modules.Auth.Domain.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VMS.Modules.Auth.Domain.UserAccount", null)
+                        .WithMany("UserRoles")
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("VMS.Modules.Auth.Domain.UserSession", b =>
                 {
                     b.HasOne("VMS.Modules.Auth.Domain.UserAccount", null)
@@ -299,6 +503,11 @@ namespace VMS.Modules.Auth.Data.Migrations
                         .HasForeignKey("UserID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("VMS.Modules.Auth.Domain.UserAccount", b =>
+                {
+                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }

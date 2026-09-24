@@ -84,6 +84,11 @@ public class CreateUserRequest
     public string? Phone { get; set; }
     public string? Department { get; set; }
     public int RoleId { get; set; }
+    /// <summary>§23B.4. Defaults to All branches when not given.</summary>
+    public string? ScopeType { get; set; }
+    public Guid? BranchId { get; set; }
+    /// <summary>§23B.1: the Business Partner this user is the same person as, when they are also a driver (OQ-20).</summary>
+    public int? LinkedPartnerId { get; set; }
 }
 
 public class UserListFilter
@@ -112,6 +117,10 @@ public class UserListItemModel
     public DropDownVM? Role { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    /// <summary>The primary role's data scope (§23B.4).</summary>
+    public string ScopeType { get; set; } = string.Empty;
+    public Guid? BranchId { get; set; }
+    public string? BranchName { get; set; }
 }
 
 public class UserDetailModel : UserListItemModel
@@ -122,6 +131,21 @@ public class UserDetailModel : UserListItemModel
     /// password. Handed over here so onboarding works when outbound email is not configured.
     /// </summary>
     public string? InviteLink { get; set; }
+    public int? LinkedPartnerId { get; set; }
+    public string? LinkedPartnerName { get; set; }
+    /// <summary>Every role this user holds, beyond the primary one (§23B.1: effective permission is the union).</summary>
+    public List<UserRoleModel> Roles { get; set; } = [];
+}
+
+/// <summary>One role a user holds, with its own scope — for the "why can they see that" effective-permissions viewer (§23B.6).</summary>
+public class UserRoleModel
+{
+    public int RoleId { get; set; }
+    public string RoleName { get; set; } = string.Empty;
+    public bool IsPrimary { get; set; }
+    public string ScopeType { get; set; } = string.Empty;
+    public Guid? BranchId { get; set; }
+    public string? BranchName { get; set; }
 }
 
 public class PatchUserRequest
@@ -136,6 +160,27 @@ public class PatchUserRequest
 public class AssignRoleRequest
 {
     public int RoleId { get; set; }
+}
+
+/// <summary>Adds a role the user holds alongside their existing ones, each with its own scope (§23B.1, §23B.4).</summary>
+public class AddRoleRequest
+{
+    public int RoleId { get; set; }
+    public string? ScopeType { get; set; }
+    public Guid? BranchId { get; set; }
+}
+
+/// <summary>Sets the primary role's data scope (§23B.4).</summary>
+public class SetScopeRequest
+{
+    public string ScopeType { get; set; } = string.Empty;
+    public Guid? BranchId { get; set; }
+}
+
+/// <summary>Links or unlinks the Business Partner this user is the same person as (§23B.1, OQ-20). Null clears the link.</summary>
+public class SetDriverLinkRequest
+{
+    public int? PartnerId { get; set; }
 }
 
 // ── Role management ──────────────────────────────────────────────────────────
@@ -179,6 +224,8 @@ public class PermissionItemModel
     public string Code { get; set; } = string.Empty;
     public string? Description { get; set; }
     public bool IsAllowed { get; set; }
+    /// <summary>Interface, Operation or Field (§23B) — the permission tree editor's second grouping level.</summary>
+    public string Level { get; set; } = string.Empty;
 }
 
 public class CreateRoleRequest
@@ -210,4 +257,14 @@ public class RoleUserModel
     public string Email { get; set; } = string.Empty;
     public string? Department { get; set; }
     public bool IsActive { get; set; }
+}
+
+/// <summary>One capability a user effectively holds, and every role of theirs that grants it (§23B.6: "why can they see that?").</summary>
+public class EffectivePermissionModel
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Module { get; set; } = string.Empty;
+    public string Level { get; set; } = string.Empty;
+    public List<string> GrantedByRoles { get; set; } = [];
 }

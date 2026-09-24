@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using VMS.Modules.Auth.Domain;
+using VMS.Shared.Authorization;
 
 namespace VMS.Modules.Auth.Data.Maps;
 
@@ -26,6 +27,11 @@ internal sealed class UserAccountMap : IEntityTypeConfiguration<UserAccount>
         builder.HasIndex(x => x.InviteTokenHash);
         builder.Property(x => x.TenantId).IsRequired();
         builder.HasIndex(x => new { x.TenantId, x.RoleID });
+
+        builder.HasMany(x => x.UserRoles)
+               .WithOne()
+               .HasForeignKey(x => x.UserID)
+               .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne<Role>()
                .WithMany()
@@ -63,6 +69,7 @@ internal sealed class PermissionMap : IEntityTypeConfiguration<Permission>
         builder.Property(x => x.Code).HasMaxLength(100).IsRequired();
         builder.HasIndex(x => x.Code).IsUnique();
         builder.Property(x => x.Module).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Level).HasMaxLength(12).IsRequired().HasDefaultValue("Operation");
         builder.Property(x => x.Description).HasMaxLength(500);
     }
 }
@@ -81,6 +88,41 @@ internal sealed class RoleMap : IEntityTypeConfiguration<Role>
         // Two tenants may each have their own "DISPATCHER"; a tenant may not repeat its own code,
         // and (TenantId is null for every global role) the global codes are unique among themselves.
         builder.HasIndex(x => new { x.TenantId, x.RoleCode }).IsUnique();
+    }
+}
+
+internal sealed class UserRoleMap : IEntityTypeConfiguration<UserRole>
+{
+    public void Configure(EntityTypeBuilder<UserRole> builder)
+    {
+        builder.ToTable("UserRoles");
+        builder.HasKey(x => x.UserRoleID);
+        builder.Property(x => x.ScopeType).HasMaxLength(20).IsRequired().HasDefaultValue(ScopeTypes.AllBranches);
+        builder.Property(x => x.TenantId).IsRequired();
+        // A user holds a given role once; the scope says where it applies.
+        builder.HasIndex(x => new { x.UserID, x.RoleID }).IsUnique();
+        builder.HasIndex(x => new { x.TenantId, x.RoleID });
+
+        builder.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleID).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class AccessDenialMap : IEntityTypeConfiguration<AccessDenialRecord>
+{
+    public void Configure(EntityTypeBuilder<AccessDenialRecord> builder)
+    {
+        builder.ToTable("AccessDenials");
+        builder.HasKey(x => x.AccessDenialID);
+        builder.Property(x => x.AccessDenialID).ValueGeneratedOnAdd();
+        builder.Property(x => x.UserName).HasMaxLength(200);
+        builder.Property(x => x.Permission).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Method).HasMaxLength(10).IsRequired();
+        builder.Property(x => x.Path).HasMaxLength(500).IsRequired();
+        builder.Property(x => x.RouteValues).HasMaxLength(500);
+        builder.Property(x => x.IpAddress).HasMaxLength(64);
+        // "Who is being refused repeatedly?" and "what is being refused?" are the two questions asked of this table.
+        builder.HasIndex(x => new { x.TenantId, x.UserId, x.OccurredAt });
+        builder.HasIndex(x => new { x.TenantId, x.Permission, x.OccurredAt });
     }
 }
 

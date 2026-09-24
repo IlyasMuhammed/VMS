@@ -2,10 +2,10 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { PasswordModule } from 'primeng/password';
-import { MessageService } from 'primeng/api';
 import { AuthService } from '../../core/auth.service';
 import { AccountApi } from '../../core/api.services';
 import { errorMessage } from '../../core/api-error';
+import { NotifyService } from '../../core/notify.service';
 import { PASSWORD_HINT, passwordsMatch, strongPassword } from '../../core/validators';
 
 @Component({
@@ -69,7 +69,7 @@ export class ProfileComponent {
   readonly auth = inject(AuthService);
   private readonly api = inject(AccountApi);
   private readonly fb = inject(FormBuilder);
-  private readonly toast = inject(MessageService);
+  private readonly notify = inject(NotifyService);
 
   readonly hint = PASSWORD_HINT;
   readonly busy = signal(false);
@@ -91,7 +91,7 @@ export class ProfileComponent {
     const { current, password } = this.form.getRawValue();
     this.api.changePassword(current, password).subscribe({
       next: () => {
-        this.toast.add({ severity: 'success', summary: 'Password changed', detail: 'Please sign in again.' });
+        this.notify.success('Please sign in again.', 'Password changed');
         // The server has ended every session, including this one.
         this.auth.clearSession();
         location.assign('/auth/login');

@@ -1,9 +1,10 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
+import { safeReturnUrl } from '../../core/access';
 import { AuthService } from '../../core/auth.service';
 import { errorMessage } from '../../core/api-error';
 
@@ -37,6 +38,7 @@ export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly busy = signal(false);
   readonly error = signal('');
@@ -52,7 +54,8 @@ export class LoginComponent {
     this.error.set('');
     const { email, password } = this.form.getRawValue();
     this.auth.login(email, password).subscribe({
-      next: () => this.router.navigate(['/']),
+      // Back to the page they were on their way to when the session ended, if it is one of ours.
+      next: () => this.router.navigateByUrl(safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl'))),
       error: (err) => {
         this.error.set(errorMessage(err, 'Sign-in failed.'));
         this.busy.set(false);

@@ -20,14 +20,14 @@ internal sealed class TenantSnapshotProvider(TenancyDbContext db, IMemoryCache c
         if (cache.TryGetValue<TenantSnapshot>(CacheKey(tenantId), out var cached))
             return cached;
 
-        var isActive = await db.Tenants.AsNoTracking()
+        var row = await db.Tenants.AsNoTracking()
             .Where(t => t.Id == tenantId)
-            .Select(t => (bool?)t.IsActive)
+            .Select(t => new { t.IsActive, t.TimeZone })
             .FirstOrDefaultAsync();
 
-        if (isActive is null) return null;
+        if (row is null) return null;
 
-        var snapshot = new TenantSnapshot(isActive.Value);
+        var snapshot = new TenantSnapshot(row.IsActive, row.TimeZone);
         cache.Set(CacheKey(tenantId), snapshot, CacheTtl);
         return snapshot;
     }

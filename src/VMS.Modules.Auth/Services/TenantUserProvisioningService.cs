@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Auth.Data;
 using VMS.Modules.Auth.Domain;
 using VMS.Modules.Auth.Infrastructure;
+using VMS.Shared.Authorization;
 using VMS.Shared.Common;
 using VMS.Shared.Exceptions;
 
@@ -44,6 +45,7 @@ internal sealed class TenantUserProvisioningService(
         };
         user.PasswordHash = hasher.HashPassword(user, TokenHelper.NewToken());
 
+        user.UserRoles.Add(new UserRole { RoleID = roleId, ScopeType = ScopeTypes.AllBranches, TenantId = tenantId });
         db.UserAccounts.Add(user);
         await db.SaveChangesAsync();
 

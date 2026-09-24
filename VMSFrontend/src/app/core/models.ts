@@ -56,11 +56,55 @@ export interface UserListItem {
   role?: DropDown;
   createdDate: string;
   lastLoginAt?: string;
+  /** The primary role's data scope (§23B.4). */
+  scopeType: string;
+  branchId?: string | null;
+  branchName?: string | null;
 }
 
 export interface UserDetail extends UserListItem {
   phone?: string;
   inviteLink?: string;
+  linkedPartnerId?: number | null;
+  linkedPartnerName?: string | null;
+  roles: UserRoleItem[];
+}
+
+/** One role a user holds, with its own scope (§23B.1, §23B.4) — the "why can they see that" data. */
+export interface UserRoleItem {
+  roleId: number;
+  roleName: string;
+  isPrimary: boolean;
+  scopeType: string;
+  branchId?: string | null;
+  branchName?: string | null;
+}
+
+/** 'AllBranches' | 'OwnBranch' | 'OwnVehicles' | 'OwnRecords' (§23B.4) — a plain string here, like every other option-driven field; the server validates it. */
+export type ScopeType = string;
+
+export interface SetScopeRequest {
+  scopeType: ScopeType;
+  branchId?: string | null;
+}
+
+export interface SetDriverLinkRequest {
+  partnerId?: number | null;
+}
+
+export interface AddRoleRequest {
+  roleId: number;
+  scopeType?: ScopeType;
+  branchId?: string | null;
+}
+
+/** One capability a user effectively holds, and every role of theirs that grants it (§23B.6). */
+export interface EffectivePermission {
+  code: string;
+  name: string;
+  module: string;
+  level: string;
+  grantedByRoles: string[];
 }
 
 export interface UserListFilter {
@@ -106,6 +150,8 @@ export interface PermissionItem {
   code: string;
   description?: string;
   isAllowed: boolean;
+  /** Interface, Operation or Field (§23B) — the permission tree's second grouping level. */
+  level: string;
 }
 
 export interface PermissionGroup {
@@ -173,4 +219,55 @@ export interface CreateTenantResult {
   tenantId: string;
   adminUserId: number;
   adminInviteLink: string;
+}
+
+// ── Master lists (lookups) ──────────────────────────────────────────────────────
+
+export type LookupAttributeKind = 'Flag' | 'Number' | 'Text' | 'Lookup';
+
+/** An extra field a list's values carry, beyond code, description, sort order and active flag. */
+export interface LookupAttribute {
+  key: string;
+  label: string;
+  kind: LookupAttributeKind;
+  required: boolean;
+  /** For a `Lookup` field: the list whose values can be chosen. */
+  lookupType?: string | null;
+}
+
+export interface LookupType {
+  code: string;
+  name: string;
+  description: string;
+  attributes: LookupAttribute[];
+  activeCount: number;
+  totalCount: number;
+}
+
+export interface LookupItem {
+  id: number;
+  code: string;
+  description: string;
+  sortOrder: number;
+  isActive: boolean;
+  /** Extra fields as text: `'true'`/`'false'` for a flag, a whole number, text, or the code of another list's value. */
+  attributes: Record<string, string | null>;
+}
+
+/** One of the tenant's own locations (FSD §6 field 15). A tenant starts with one, "Head Office" (OQ-10). */
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface SaveLookupRequest {
+  /** Only when adding; a value's code never changes. */
+  code?: string;
+  description: string;
+  /** Left out when adding, the value goes to the end of the list. */
+  sortOrder?: number | null;
+  isActive?: boolean;
+  attributes: Record<string, string | null>;
 }

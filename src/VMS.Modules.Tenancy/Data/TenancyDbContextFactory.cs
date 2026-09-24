@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using VMS.Shared.Auditing;
 using VMS.Shared.Common;
 
 namespace VMS.Modules.Tenancy.Data;
@@ -14,6 +15,6 @@ internal sealed class TenancyDbContextFactory : IDesignTimeDbContextFactory<Tena
                 sql.MigrationsHistoryTable("__EFMigrationsHistory", TenancyDbContext.Schema))
             .Options;
 
-        return new TenancyDbContext(options);
+        return new TenancyDbContext(options, new StaticTenantContext(), NoAuditContext.Instance);
     }
 }

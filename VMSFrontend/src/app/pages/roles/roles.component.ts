@@ -1,7 +1,6 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
@@ -10,18 +9,19 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { RolesApi } from '../../core/api.services';
 import { AuthService } from '../../core/auth.service';
-import { errorMessage } from '../../core/api-error';
+import { HasPermissionDirective } from '../../core/has-permission.directive';
+import { NotifyService } from '../../core/notify.service';
 import { RoleListItem } from '../../core/models';
 
 @Component({
   selector: 'app-roles',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, TableModule, ButtonModule, DialogModule, InputTextModule, TagModule, CheckboxModule],
+  imports: [ReactiveFormsModule, RouterLink, HasPermissionDirective, TableModule, ButtonModule, DialogModule, InputTextModule, TagModule, CheckboxModule],
   template: `
     <div class="page">
       <div class="page-header">
         <div><h1>Roles</h1><div class="sub">A role is a named set of permissions you can give to users.</div></div>
-        @if (canManage()) { <p-button label="New role" icon="pi pi-plus" (onClick)="openCreate()" /> }
+        <p-button *vmsCan="'ROLE_MANAGE'" label="New role" icon="pi pi-plus" (onClick)="openCreate()" />
       </div>
 
       <div class="card">
@@ -69,9 +69,8 @@ export class RolesComponent implements OnInit {
   private readonly api = inject(RolesApi);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
-  private readonly toast = inject(MessageService);
+  private readonly notify = inject(NotifyService);
 
-  readonly canManage = computed(() => this.auth.hasPermission('ROLE_MANAGE'));
   readonly rows = signal<RoleListItem[]>([]);
   readonly loading = signal(false);
   readonly busy = signal(false);
@@ -96,7 +95,7 @@ export class RolesComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.toast.add({ severity: 'error', summary: 'Error', detail: errorMessage(err) });
+        this.notify.error(err);
         this.loading.set(false);
       },
     });
@@ -118,7 +117,7 @@ export class RolesComponent implements OnInit {
       },
       error: (err) => {
         this.busy.set(false);
-        this.toast.add({ severity: 'error', summary: 'Error', detail: errorMessage(err) });
+        this.notify.error(err);
       },
     });
   }

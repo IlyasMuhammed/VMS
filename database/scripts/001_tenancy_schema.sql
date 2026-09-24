@@ -97,6 +97,15 @@ BEGIN
     VALUES (N'20260919230142_AddTenantLogos', N'9.0.2');
 END;
 
+IF NOT EXISTS (
+    SELECT * FROM [tenancy].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920055449_AuditTableMapped'
+)
+BEGIN
+    INSERT INTO [tenancy].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260920055449_AuditTableMapped', N'9.0.2');
+END;
+
 COMMIT;
 GO
 

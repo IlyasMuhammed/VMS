@@ -9,6 +9,7 @@ namespace VMS.Modules.Tenancy.Controllers;
 /// <summary>The signed-in user's own tenant — any authenticated user may read it.</summary>
 [ApiController]
 [Route("api/tenant")]
+[AuthenticatedOnly] // any signed-in user may read their own tenant and its logos
 public class CurrentTenantController(ITenantService tenants) : ControllerBase
 {
     [HttpGet]

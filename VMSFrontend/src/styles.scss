@@ -68,8 +68,14 @@ a { color: var(--vms-brand-text); }
   gap: .35rem;
 
   label { font-weight: 600; font-size: .85rem; }
+  .req { color: var(--vms-danger); }
   .error { color: var(--vms-danger); font-size: .8rem; }
   .hint { color: var(--vms-muted); font-size: .8rem; }
+
+  // A field with a message shown (see <vms-field>): the control gets a red edge, whichever component draws it.
+  &.invalid {
+    input, .p-inputtext, .p-select, .p-multiselect, .p-datepicker { border-color: var(--vms-danger); }
+  }
 }
 
 .alert {

@@ -1,7 +1,6 @@
-import { DatePipe } from '@angular/common';
 import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
@@ -10,6 +9,8 @@ import { TagModule } from 'primeng/tag';
 import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { TenantsApi } from '../../core/api.services';
 import { errorMessage } from '../../core/api-error';
+import { InstantPipe } from '../../core/datetime/datetime.pipes';
+import { NotifyService } from '../../core/notify.service';
 import { LogoVariant, TenantListItem } from '../../core/models';
 import { LogoUploadComponent } from './logo-upload.component';
 
@@ -18,7 +19,7 @@ const VARIANTS: readonly LogoVariant[] = ['light', 'dark'];
 @Component({
   selector: 'app-tenants',
   standalone: true,
-  imports: [DatePipe, FormsModule, ReactiveFormsModule, TableModule, ButtonModule, DialogModule, InputTextModule, TagModule, LogoUploadComponent],
+  imports: [InstantPipe, FormsModule, ReactiveFormsModule, TableModule, ButtonModule, DialogModule, InputTextModule, TagModule, LogoUploadComponent],
   template: `
     <div class="page">
       <div class="page-header">
@@ -39,7 +40,7 @@ const VARIANTS: readonly LogoVariant[] = ['light', 'dark'];
               <td>{{ t.tenantCode }}</td>
               <td>{{ t.tenantName }}</td>
               <td>{{ t.contactEmail }}</td>
-              <td>{{ t.createdDate | date: 'mediumDate' }}</td>
+              <td>{{ t.createdDate | vmsInstant: 'date' }}</td>
               <td><p-tag [value]="t.isActive ? 'Active' : 'Inactive'" [severity]="t.isActive ? 'success' : 'secondary'" /></td>
               <td>
                 <div class="actions">
@@ -113,7 +114,7 @@ const VARIANTS: readonly LogoVariant[] = ['light', 'dark'];
 export class TenantsComponent implements OnDestroy {
   private readonly api = inject(TenantsApi);
   private readonly fb = inject(FormBuilder);
-  private readonly toast = inject(MessageService);
+  private readonly notify = inject(NotifyService);
   private readonly confirm = inject(ConfirmationService);
 
   readonly rows = signal<TenantListItem[]>([]);
@@ -338,14 +339,14 @@ export class TenantsComponent implements OnDestroy {
   }
 
   private warnLogos(failed: string[], summary = 'Tenant created'): void {
-    this.toast.add({ severity: 'warn', summary, detail: `${failed.join(' ')} You can add logos from Edit tenant.`, life: 9000 });
+    this.notify.warn(`${failed.join(' ')} You can add logos from Edit tenant.`, summary, 9000);
   }
 
   private ok(detail: string): void {
-    this.toast.add({ severity: 'success', summary: 'Done', detail });
+    this.notify.success(detail);
   }
 
   private fail(err: unknown): void {
-    this.toast.add({ severity: 'error', summary: 'Error', detail: errorMessage(err) });
+    this.notify.error(err);
   }
 }

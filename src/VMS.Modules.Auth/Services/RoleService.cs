@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Auth.Data;
 using VMS.Modules.Auth.Domain;
 using VMS.Modules.Auth.Models;
+using VMS.Shared.Authorization;
 using VMS.Shared.Exceptions;
 
 namespace VMS.Modules.Auth.Services;
@@ -106,6 +107,19 @@ internal sealed partial class RoleService(AuthDbContext db) : IRoleService
         if (permissions.Count != wanted.Count)
             throw new BadRequestException("One or more permissions do not exist.");
 
+        var roleManageId = await db.Permissions.Where(p => p.Code == PermissionCodes.ROLE_MANAGE).Select(p => p.PermissionID).FirstOrDefaultAsync();
+        var losingRoleManage = roleManageId != 0 && !wanted.Contains(roleManageId) && await db.RolePermissions.AnyAsync(rp => rp.RoleID == roleId && rp.PermissionID == roleManageId);
+        if (losingRoleManage)
+        {
+            // BR-SEC-008 part one: the built-in Administrator role can never be stripped of it, full stop.
+            if (role.RoleCode is RoleCodes.SuperAdmin or RoleCodes.TenantAdmin)
+                throw new ConflictException("The built-in Administrator role cannot be stripped of Manage roles.");
+            // Part two: any other role that happens to be a tenant's only source of it is protected the same way.
+            // (A global custom role with no owning tenant is a platform-level concern beyond this check's scope.)
+            if (role.TenantId is { } roleTenantId)
+                await EnsureSomeOtherRoleGrantsAdminAsync(roleId, roleManageId, roleTenantId);
+        }
+
         var existing = await db.RolePermissions.Where(rp => rp.RoleID == roleId).ToListAsync();
         var already = existing.Select(rp => rp.PermissionID).ToHashSet();
 
@@ -137,6 +151,9 @@ internal sealed partial class RoleService(AuthDbContext db) : IRoleService
     {
         var role = await LoadAsync(roleId);
         RoleGuard.EnsureCanModify(role, caller);
+        // BR-SEC-008: "cannot be deleted" — deactivation is as close as this system gets to deleting a role.
+        if (role.RoleCode is RoleCodes.SuperAdmin or RoleCodes.TenantAdmin)
+            throw new ConflictException("The built-in Administrator role cannot be deactivated.");
         await EnsureNoActiveUsersAsync(roleId);
 
         role.IsActive = false;
@@ -174,6 +191,25 @@ internal sealed partial class RoleService(AuthDbContext db) : IRoleService
             throw new ConflictException($"{count} active user(s) still hold this role. Move them to another role first.");
     }
 
+    /// <summary>
+    /// BR-SEC-008: would stripping Manage roles from this one role leave nobody in the tenant able to manage roles at all?
+    /// Explicitly scoped to <paramref name="tenantId"/>, not the ambient ITenantContext: a Super Admin's request bypasses
+    /// the tenant query filter entirely (by design), which would otherwise let this see every tenant's administrators.
+    /// </summary>
+    private async Task EnsureSomeOtherRoleGrantsAdminAsync(int roleId, int roleManagePermissionId, Guid tenantId)
+    {
+        var otherAdminRoleIds = await db.RolePermissions
+            .Where(rp => rp.PermissionID == roleManagePermissionId && rp.RoleID != roleId)
+            .Select(rp => rp.RoleID).ToListAsync();
+
+        var stillHeld = otherAdminRoleIds.Count > 0 &&
+            await db.UserAccounts.IgnoreQueryFilters().AnyAsync(u => u.IsActive && !u.IsDeleted && u.TenantId == tenantId &&
+                db.UserRoles.IgnoreQueryFilters().Any(ur => ur.UserID == u.UserID && otherAdminRoleIds.Contains(ur.RoleID)));
+
+        if (!stillHeld)
+            throw new ConflictException("This is the tenant's only source of Manage roles. Grant it to another role first, or this would leave nobody able to manage roles.");
+    }
+
     private async Task<List<PermissionGroupModel>> BuildGroupsAsync(HashSet<int> allowed)
     {
         var permissions = await db.Permissions.AsNoTracking().OrderBy(p => p.Module).ThenBy(p => p.Name).ToListAsync();
@@ -188,7 +224,8 @@ internal sealed partial class RoleService(AuthDbContext db) : IRoleService
                     Name = p.Name,
                     Code = p.Code,
                     Description = p.Description,
-                    IsAllowed = allowed.Contains(p.PermissionID)
+                    IsAllowed = allowed.Contains(p.PermissionID),
+                    Level = p.Level
                 }).ToList()
             })
             .ToList();

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using VMS.Modules.Tenancy.Data;
 using VMS.Modules.Tenancy.Services;
 using VMS.Shared.Common;
+using VMS.Shared.Tenancy;
 
 namespace VMS.Modules.Tenancy;
 
@@ -30,6 +31,7 @@ public static class TenancyModuleExtensions
         services.AddScoped<ITenantStatusService, TenantStatusService>();
         services.AddScoped<ISuperAdminService, SuperAdminService>();
         services.AddScoped<ITenantSnapshotProvider, TenantSnapshotProvider>();
+        services.AddScoped<ITenantDirectory, TenantDirectory>();
         services.AddScoped<TenancyDataSeeder>();
 
         return services;

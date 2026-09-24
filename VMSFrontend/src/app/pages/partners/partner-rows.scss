@@ -1,0 +1,27 @@
+// The rows of the Contacts, Addresses and Bank accounts tabs: one bordered block per row, its fields in a grid, its actions beneath.
+:host { display: block; }
+
+.intro { margin: 0 0 1rem; }
+
+.card-row {
+  border: 1px solid var(--vms-border);
+  border-radius: var(--vms-radius);
+  background: var(--vms-surface);
+  padding: 1rem;
+  margin-bottom: .75rem;
+}
+
+.registered { display: flex; flex-direction: column; gap: .25rem; margin-bottom: 1.25rem; background: var(--vms-neutral-bg); }
+
+.cols { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: .75rem;
+}
+
+.primary { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; }
+
+.empty { margin: 0 0 1rem; }

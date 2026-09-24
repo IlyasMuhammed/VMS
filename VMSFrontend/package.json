@@ -10,7 +10,13 @@
     "prebuild": "node scripts/check-no-hardcoded-colors.mjs",
     "watch": "ng build --watch --configuration development",
     "check:colors": "node scripts/check-no-hardcoded-colors.mjs",
-    "check:contrast": "node scripts/check-theme-contrast.mjs"
+    "check:contrast": "node scripts/check-theme-contrast.mjs",
+    "check:datetime": "node scripts/check-datetime.mjs",
+    "check:access": "node --test scripts/check-access.test.mjs",
+    "check:shared": "node --test scripts/check-shared.test.mjs",
+    "check:partners": "node --test scripts/check-partners.test.mjs",
+    "check:vehicles": "node --test scripts/check-vehicles.test.mjs",
+    "test": "npm run check:access && npm run check:shared && npm run check:datetime && npm run check:partners && npm run check:vehicles"
   },
   "dependencies": {
     "@angular/animations": "^19.2.0",

@@ -19,8 +19,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VMS.Shared\VMS.Shared.csproj" />
+    <ProjectReference Include="..\VMS.Modules.Core\VMS.Modules.Core.csproj" />
     <ProjectReference Include="..\VMS.Modules.Auth\VMS.Modules.Auth.csproj" />
     <ProjectReference Include="..\VMS.Modules.Tenancy\VMS.Modules.Tenancy.csproj" />
+    <ProjectReference Include="..\VMS.Modules.BusinessPartners\VMS.Modules.BusinessPartners.csproj" />
+    <ProjectReference Include="..\VMS.Modules.Vehicles\VMS.Modules.Vehicles.csproj" />
+    <ProjectReference Include="..\VMS.Modules.Documents\VMS.Modules.Documents.csproj" />
+    <ProjectReference Include="..\VMS.Modules.Notifications\VMS.Modules.Notifications.csproj" />
   </ItemGroup>
 
 </Project>
+

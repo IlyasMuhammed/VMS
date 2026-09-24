@@ -1,18 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { buildNav } from '../core/access';
 import { AuthService } from '../core/auth.service';
 import { TenantsApi } from '../core/api.services';
 import { TenantBrandingService } from '../core/tenant-branding.service';
 import { ThemeService } from '../core/theme/theme.service';
 import { ThemeSwitcherComponent } from './theme-switcher.component';
-
-interface NavItem {
-  label: string;
-  icon: string;
-  route: string;
-  visible: boolean;
-}
+import { NotificationBellComponent } from './notification-bell.component';
 
 /**
  * One DOM structure, two layouts. The active theme decides whether the navigation is a sidebar
@@ -22,7 +17,7 @@ interface NavItem {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgTemplateOutlet, ThemeSwitcherComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgTemplateOutlet, ThemeSwitcherComponent, NotificationBellComponent],
   template: `
     <div class="shell" [attr.data-layout]="layout()">
       <aside class="chrome">
@@ -31,11 +26,16 @@ interface NavItem {
           <span class="brand-text">Vehicle Management</span>
         </div>
         <nav aria-label="Main">
-          @for (item of nav(); track item.route) {
-            <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: item.route === '/' }">
-              <i [class]="'pi ' + item.icon" aria-hidden="true"></i>
-              <span>{{ item.label }}</span>
-            </a>
+          @for (group of nav(); track group.section) {
+            <div class="group">
+              @if (group.section) { <span class="section">{{ group.section }}</span> }
+              @for (item of group.items; track item.route) {
+                <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: item.exact }">
+                  <i [class]="'pi ' + item.icon" aria-hidden="true"></i>
+                  <span>{{ item.label }}</span>
+                </a>
+              }
+            </div>
           }
         </nav>
         @if (layout() === 'topbar') {
@@ -70,6 +70,7 @@ interface NavItem {
 
     <ng-template #toolsTpl>
       <app-theme-switcher [onChrome]="layout() === 'topbar'" />
+      <app-notification-bell [onChrome]="layout() === 'topbar'" />
       <a routerLink="/profile" class="who">
         <i class="pi pi-user" aria-hidden="true"></i>
         <span>{{ fullName() }}</span>
@@ -88,6 +89,9 @@ interface NavItem {
       .logo { background: var(--vms-brand); color: var(--vms-on-brand); font-weight: 700; border-radius: var(--vms-radius-sm); padding: .35rem .5rem; font-size: .9rem; }
       .brand-text { color: var(--vms-chrome-strong); font-weight: 600; white-space: nowrap; }
       nav { display: flex; gap: .15rem; }
+      /* A group is only a way to hold a heading with its items; in a row (top bar) it should not exist as a box. */
+      .group { display: contents; }
+      .section { padding: .9rem .85rem .3rem; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--vms-chrome-muted); }
       nav a span { white-space: nowrap; }
       nav a { display: flex; align-items: center; gap: .75rem; padding: .65rem .85rem; border-radius: var(--vms-radius-sm); color: inherit; text-decoration: none; }
       nav a:hover { background: var(--vms-chrome-hover); }
@@ -120,6 +124,7 @@ interface NavItem {
       .shell[data-layout='topbar'] .chrome { flex-direction: row; align-items: center; gap: 1.75rem; height: 56px; padding: 0 1.5rem; border-bottom: 1px solid var(--vms-chrome-border); }
       .shell[data-layout='topbar'] nav { align-self: stretch; }
       .shell[data-layout='topbar'] nav a { border-radius: 0; border-bottom: 2px solid transparent; padding: 0 .9rem; }
+      .shell[data-layout='topbar'] .section { display: none; }
       .shell[data-layout='topbar'] nav a.active { background: transparent; border-bottom-color: var(--vms-chrome-accent); color: var(--vms-chrome-active-text); }
       .shell[data-layout='topbar'] .tools { margin-left: auto; --fg: var(--vms-chrome-text); --soft: var(--vms-chrome-muted); --chip: var(--vms-chrome-hover); }
       .shell[data-layout='topbar'] .tenant { --sep: var(--vms-chrome-border); color: var(--vms-chrome-muted); font-weight: 500; }
@@ -130,13 +135,14 @@ interface NavItem {
       }
       @media (max-width: 800px) {
         .shell[data-layout='sidebar'] .chrome { width: 64px; }
-        .brand-text, nav a span, .who span, .who small, .tenant span { display: none; }
+        .brand-text, nav a span, .who span, .who small, .tenant span, .section { display: none; }
       }
     `,
   ],
 })
 export class ShellComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly tenants = inject(TenantsApi);
   private readonly branding = inject(TenantBrandingService);
   private readonly theme = inject(ThemeService);
@@ -160,14 +166,8 @@ export class ShellComponent implements OnInit, OnDestroy {
     return preferred ?? fallback;
   });
 
-  readonly nav = computed<NavItem[]>(() =>
-    [
-      { label: 'Dashboard', icon: 'pi-home', route: '/', visible: true },
-      { label: 'Users', icon: 'pi-users', route: '/users', visible: this.auth.hasPermission('USER_VIEW') },
-      { label: 'Roles', icon: 'pi-shield', route: '/roles', visible: this.auth.hasPermission('ROLE_VIEW') },
-      { label: 'Tenants', icon: 'pi-building', route: '/tenants', visible: this.auth.isSuperAdmin() },
-    ].filter((i) => i.visible),
-  );
+  /** Read from the routes' own declarations (app.routes.ts), so the menu can only show what the guard lets through. */
+  readonly nav = computed(() => buildNav(this.router.config, this.auth.user()));
 
   ngOnInit(): void {
     this.tenants.current().subscribe({

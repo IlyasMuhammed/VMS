@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Tenancy.Domain;
+using VMS.Shared.Auditing;
+using VMS.Shared.Common;
+using VMS.Shared.Time;
 
 namespace VMS.Modules.Tenancy.Data;
 
-internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> options) : DbContext(options)
+internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> options, ITenantContext tenantContext, IAuditContext audit)
+    : DbContext(options)
 {
     internal const string Schema = "tenancy";
 
@@ -11,9 +15,13 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
     internal DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
     internal DbSet<SuperAdminUser> SuperAdminUsers => Set<SuperAdminUser>();
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) =>
+        configurationBuilder.UseUtcDateTimes();   // every instant is stored, and read back, as UTC
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.MapAuditEntries(); // the Core module owns the table; this context only writes to it
 
         modelBuilder.Entity<Tenant>(b =>
         {
@@ -49,4 +57,12 @@ internal sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> option
             b.Property(x => x.UserId).ValueGeneratedNever();
         });
     }
+
+    // Tenant rows are not filtered by tenant, so audit rows for them are filed under the acting user's tenant.
+    public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
+        this.SaveAudited(audit, tenantContext.TenantId, acceptAllChangesOnSuccess, a => base.SaveChanges(a));
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default) =>
+        this.SaveAuditedAsync(audit, tenantContext.TenantId, acceptAllChangesOnSuccess,
+            (a, ct) => base.SaveChangesAsync(a, ct), cancellationToken);
 }

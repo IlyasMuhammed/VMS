@@ -18,6 +18,19 @@ internal sealed partial class TenantService(
     [GeneratedRegex("^[A-Z0-9][A-Z0-9-]{1,29}$")]
     private static partial Regex TenantCodePattern();
 
+    /// <summary>
+    /// The tenant's time zone decides which calendar day its numbers, reminders and reports fall on, so a
+    /// typo must not quietly fall back to the default. Blank means "use the platform default".
+    /// </summary>
+    private static string? CleanTimeZone(string? value)
+    {
+        var zone = value?.Trim();
+        if (string.IsNullOrEmpty(zone)) return null;
+        if (!TimeZoneInfo.TryFindSystemTimeZoneById(zone, out _))
+            throw new BadRequestException($"'{zone}' is not a known time zone. Use a name such as Asia/Karachi.");
+        return zone;
+    }
+
     public async Task<PaginatedResponse<TenantListItemModel>> GetTenantsAsync(TenantFilter filter)
     {
         var page = Math.Max(1, filter.Page);
@@ -85,6 +98,7 @@ internal sealed partial class TenantService(
             throw new BadRequestException("Tenant name is required.");
         if (string.IsNullOrWhiteSpace(request.AdminFirstName) || string.IsNullOrWhiteSpace(request.AdminEmail))
             throw new BadRequestException("The tenant admin's first name and email are required.");
+        var timeZone = CleanTimeZone(request.TimeZone);
         if (await db.Tenants.AnyAsync(t => t.TenantCode == code))
             throw new ConflictException($"Tenant code '{code}' is already in use.");
         // Checked up front so a duplicate email fails before anything is written.
@@ -101,7 +115,7 @@ internal sealed partial class TenantService(
             ContactPhone = request.ContactPhone?.Trim(),
             Address = request.Address?.Trim(),
             Country = request.Country?.Trim(),
-            TimeZone = request.TimeZone?.Trim(),
+            TimeZone = timeZone,
             CreatedBy = createdBy,
             CreatedDate = DateTime.UtcNow
         };
@@ -129,6 +143,7 @@ internal sealed partial class TenantService(
     {
         if (string.IsNullOrWhiteSpace(request.TenantName))
             throw new BadRequestException("Tenant name is required.");
+        var timeZone = CleanTimeZone(request.TimeZone);
 
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == id);
         if (tenant is null) return false;
@@ -138,10 +153,11 @@ internal sealed partial class TenantService(
         tenant.ContactPhone = request.ContactPhone?.Trim();
         tenant.Address = request.Address?.Trim();
         tenant.Country = request.Country?.Trim();
-        tenant.TimeZone = request.TimeZone?.Trim();
+        tenant.TimeZone = timeZone;
         tenant.ModifiedBy = modifiedBy;
         tenant.ModifiedDate = DateTime.UtcNow;
         await db.SaveChangesAsync();
+        snapshots.Invalidate(id);   // the cached snapshot carries the time zone; a change must apply at once
         return true;
     }
 

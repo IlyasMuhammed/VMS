@@ -4,6 +4,7 @@ using VMS.Modules.Auth.Data;
 using VMS.Modules.Auth.Domain;
 using VMS.Modules.Auth.Infrastructure;
 using VMS.Modules.Auth.Models;
+using VMS.Shared.Authorization;
 using VMS.Shared.Common;
 using VMS.Shared.Exceptions;
 
@@ -240,9 +241,9 @@ internal sealed class AuthService(
 
     private async Task<(string AccessToken, string RefreshToken)> IssueSessionAsync(UserAccount user)
     {
-        var (roleName, permissions) = await LoadRoleAsync(user.RoleID);
+        var (roleName, permissions, scopeType, scopeBranchId) = await LoadRoleAsync(user.UserID, user.RoleID);
         var isSuperAdmin = await superAdmins.IsSuperAdminAsync(user.UserID);
-        var accessToken = tokens.GenerateAccessToken(user, roleName, permissions, isSuperAdmin);
+        var accessToken = tokens.GenerateAccessToken(user, roleName, permissions, isSuperAdmin, scopeType, scopeBranchId);
         var refreshToken = tokens.GenerateRefreshToken();
 
         var now = DateTime.UtcNow;
@@ -265,29 +266,42 @@ internal sealed class AuthService(
         return (accessToken, refreshToken);
     }
 
-    private async Task<(string RoleName, List<string> Permissions)> LoadRoleAsync(int roleId)
+    /// <summary>
+    /// The primary role's name (for the "roleId"/"roleName" claims and the current-user display), the effective
+    /// permission set — the union across every active role the user holds (§23B.1), not the primary role alone —
+    /// and their scope: the widest one across those same roles (§23B.4).
+    /// </summary>
+    private async Task<(string RoleName, List<string> Permissions, string ScopeType, Guid? ScopeBranchId)> LoadRoleAsync(int userId, int primaryRoleId)
     {
-        var role = await db.Roles.IgnoreQueryFilters().AsNoTracking()
-            .Where(r => r.RoleID == roleId)
-            .Select(r => new { r.Name, r.IsActive })
-            .FirstOrDefaultAsync();
-        if (role is null) return (string.Empty, []);
+        var roleName = await db.Roles.IgnoreQueryFilters().AsNoTracking()
+            .Where(r => r.RoleID == primaryRoleId).Select(r => r.Name).FirstOrDefaultAsync() ?? string.Empty;
 
-        // A deactivated role grants nothing.
-        if (!role.IsActive) return (role.Name, []);
+        // IgnoreQueryFilters() once, up front: this codebase's tenant filter is a whole-query switch, not
+        // per-table, and this query needs it off both here and on the Role join below — login runs before
+        // the ambient tenant context is established, so filtering by it here would silently return nothing.
+        // Safe regardless: every row is already scoped to this one known, already-authenticated userId.
+        var activeRoles = await (
+            from ur in db.UserRoles.IgnoreQueryFilters().AsNoTracking()
+            where ur.UserID == userId
+            join r in db.Roles.AsNoTracking() on ur.RoleID equals r.RoleID
+            where r.IsActive
+            select new { ur.ScopeType, ur.BranchId, r.RoleID }).ToListAsync();
 
-        var permissions = await (
+        var permissions = activeRoles.Count == 0 ? [] : await (
             from rp in db.RolePermissions.AsNoTracking()
+            where activeRoles.Select(a => a.RoleID).Contains(rp.RoleID)
             join p in db.Permissions.AsNoTracking() on rp.PermissionID equals p.PermissionID
-            where rp.RoleID == roleId
-            select p.Code).ToListAsync();
+            select p.Code).Distinct().ToListAsync();
 
-        return (role.Name, permissions);
+        var scopeType = ScopeTypes.Widest(activeRoles.Select(a => a.ScopeType));
+        var scopeBranchId = scopeType == ScopeTypes.OwnBranch ? activeRoles.FirstOrDefault(a => a.ScopeType == ScopeTypes.OwnBranch)?.BranchId : null;
+
+        return (roleName, permissions, scopeType, scopeBranchId);
     }
 
     private async Task<CurrentUserModel> BuildCurrentUserAsync(UserAccount user)
     {
-        var (roleName, permissions) = await LoadRoleAsync(user.RoleID);
+        var (roleName, permissions, _, _) = await LoadRoleAsync(user.UserID, user.RoleID);
         return new CurrentUserModel
         {
             UserId = user.UserID,

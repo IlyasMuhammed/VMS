@@ -34,10 +34,12 @@ public class AuthController(IAuthService auth) : ControllerBase
         return Ok(ApiResponse.Ok("Logged out."));
     }
 
+    [AuthenticatedOnly]
     [HttpGet("me")]
     public async Task<IActionResult> Me() =>
         Ok(ApiResponse<CurrentUserModel>.Ok(await auth.GetCurrentUserAsync(User.GetUserId())));
 
+    [AuthenticatedOnly]
     [HttpPut("password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {

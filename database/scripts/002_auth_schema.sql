@@ -222,6 +222,138 @@ BEGIN
     VALUES (N'20260919090545_InitialAuth', N'9.0.2');
 END;
 
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    ALTER TABLE [auth].[Permissions] ADD [Level] nvarchar(12) NOT NULL DEFAULT N'Operation';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    CREATE TABLE [auth].[AccessDenials] (
+        [AccessDenialID] bigint NOT NULL IDENTITY,
+        [OccurredAt] datetime2 NOT NULL,
+        [TenantId] uniqueidentifier NOT NULL,
+        [UserId] int NOT NULL,
+        [UserName] nvarchar(200) NULL,
+        [Permission] nvarchar(100) NOT NULL,
+        [Method] nvarchar(10) NOT NULL,
+        [Path] nvarchar(500) NOT NULL,
+        [RouteValues] nvarchar(500) NULL,
+        [IpAddress] nvarchar(64) NULL,
+        CONSTRAINT [PK_AccessDenials] PRIMARY KEY ([AccessDenialID])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    CREATE TABLE [auth].[UserRoles] (
+        [UserRoleID] int NOT NULL IDENTITY,
+        [UserID] int NOT NULL,
+        [RoleID] int NOT NULL,
+        [ScopeType] nvarchar(20) NOT NULL DEFAULT N'AllBranches',
+        [BranchId] uniqueidentifier NULL,
+        [TenantId] uniqueidentifier NOT NULL,
+        CONSTRAINT [PK_UserRoles] PRIMARY KEY ([UserRoleID]),
+        CONSTRAINT [FK_UserRoles_Roles_RoleID] FOREIGN KEY ([RoleID]) REFERENCES [auth].[Roles] ([RoleID]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_UserRoles_UserAccounts_UserID] FOREIGN KEY ([UserID]) REFERENCES [auth].[UserAccounts] ([UserID]) ON DELETE CASCADE
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    CREATE INDEX [IX_AccessDenials_TenantId_Permission_OccurredAt] ON [auth].[AccessDenials] ([TenantId], [Permission], [OccurredAt]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    CREATE INDEX [IX_AccessDenials_TenantId_UserId_OccurredAt] ON [auth].[AccessDenials] ([TenantId], [UserId], [OccurredAt]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    CREATE INDEX [IX_UserRoles_RoleID] ON [auth].[UserRoles] ([RoleID]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    CREATE INDEX [IX_UserRoles_TenantId_RoleID] ON [auth].[UserRoles] ([TenantId], [RoleID]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_UserRoles_UserID_RoleID] ON [auth].[UserRoles] ([UserID], [RoleID]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    INSERT INTO [auth].[UserRoles] ([UserID], [RoleID], [ScopeType], [TenantId])
+                      SELECT [UserID], [RoleID], N'AllBranches', [TenantId]
+                      FROM [auth].[UserAccounts]
+                      WHERE [IsDeleted] = 0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920053351_FoundationSecurity'
+)
+BEGIN
+    INSERT INTO [auth].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260920053351_FoundationSecurity', N'9.0.2');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260920055445_AuditTableMapped'
+)
+BEGIN
+    INSERT INTO [auth].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260920055445_AuditTableMapped', N'9.0.2');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260922150027_UserScopeAndDriverLink'
+)
+BEGIN
+    ALTER TABLE [auth].[UserAccounts] ADD [LinkedPartnerId] int NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [auth].[__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260922150027_UserScopeAndDriverLink'
+)
+BEGIN
+    INSERT INTO [auth].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260922150027_UserScopeAndDriverLink', N'9.0.2');
+END;
+
 COMMIT;
 GO
 

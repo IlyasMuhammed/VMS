@@ -51,6 +51,47 @@ public class UsersController(IUserService users) : ControllerBase
         return Ok(ApiResponse.Ok("Role assigned."));
     }
 
+    /// <summary>Adds a role alongside the ones the user already holds (§23B.1: effective permission is the union).</summary>
+    [HttpPost("{id:int}/roles")]
+    [RequirePermission(PermissionCodes.USER_MANAGE)]
+    public async Task<IActionResult> AddRole(int id, [FromBody] AddRoleRequest request)
+    {
+        await users.AddRoleAsync(id, request, User.ToCaller());
+        return Ok(ApiResponse.Ok("Role added."));
+    }
+
+    [HttpDelete("{id:int}/roles/{roleId:int}")]
+    [RequirePermission(PermissionCodes.USER_MANAGE)]
+    public async Task<IActionResult> RemoveRole(int id, int roleId)
+    {
+        await users.RemoveRoleAsync(id, roleId, User.ToCaller());
+        return Ok(ApiResponse.Ok("Role removed."));
+    }
+
+    /// <summary>§23B.4: the primary role's data scope.</summary>
+    [HttpPut("{id:int}/scope")]
+    [RequirePermission(PermissionCodes.USER_MANAGE)]
+    public async Task<IActionResult> SetScope(int id, [FromBody] SetScopeRequest request)
+    {
+        await users.SetScopeAsync(id, request, User.ToCaller());
+        return Ok(ApiResponse.Ok("Scope saved."));
+    }
+
+    /// <summary>§23B.1, OQ-20: the Business Partner this user is the same person as, when they are also a driver.</summary>
+    [HttpPut("{id:int}/driver-link")]
+    [RequirePermission(PermissionCodes.USER_MANAGE)]
+    public async Task<IActionResult> SetDriverLink(int id, [FromBody] SetDriverLinkRequest request)
+    {
+        await users.SetDriverLinkAsync(id, request, User.ToCaller());
+        return Ok(ApiResponse.Ok("Driver link saved."));
+    }
+
+    /// <summary>§23B.6: "why can they see that?" — the flattened union of every permission the user holds, and which role(s) grant each one.</summary>
+    [HttpGet("{id:int}/effective-permissions")]
+    [RequirePermission(PermissionCodes.USER_VIEW)]
+    public async Task<IActionResult> EffectivePermissions(int id) =>
+        Ok(ApiResponse<List<EffectivePermissionModel>>.Ok(await users.GetEffectivePermissionsAsync(id)));
+
     /// <summary>Issues a fresh one-time link for the user to set a new password, and ends their sessions.</summary>
     [HttpPost("{id:int}/reset-password")]
     [RequirePermission(PermissionCodes.USER_MANAGE)]
