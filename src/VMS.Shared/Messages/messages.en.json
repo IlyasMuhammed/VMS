@@ -73,5 +73,17 @@
   "VAL-GEN-018": "{n} other partners have this {Field}. Review them before saving.",
   "VAL-GEN-019": "This {Field} is listed twice.",
   "VAL-GEN-020": "{n} rows match, more than the {Max} an export can hold. Narrow the filter and try again.",
-  "VAL-GEN-021": "An Idempotency-Key header is required for this request."
+  "VAL-GEN-021": "An Idempotency-Key header is required for this request.",
+
+  "VAL-TRP-001": "Currency code '{Code}' already exists for this tenant.",
+  "VAL-TRP-002": "{Field} must be a 3-letter ISO 4217 code (for example PKR, USD, AED).",
+  "VAL-TRP-003": "'{Code}' is not a known currency for this tenant. Add it to the currency master first.",
+  "VAL-TRP-004": "'{Code}' is Inactive and cannot be set as the base currency.",
+  "VAL-TRP-005": "The base currency cannot be changed once transactions in the current base currency exist.",
+  "VAL-TRP-006": "Multi-currency cannot be turned off while a non-base-currency item is still open.",
+  "VAL-TRP-007": "'{Code}' is not a known currency for this tenant.",
+  "VAL-TRP-008": "'{Base}' is already the base currency; an exchange rate converts a foreign currency into it, not itself.",
+  "VAL-TRP-009": "An exchange rate for {From} → {To} on {RateDate} already exists.",
+  "VAL-TRP-010": "The selected effective date range overlaps an existing tax/deduction rule for this tax name.",
+  "VAL-TRP-011": "The selected effective date range overlaps an existing rate configuration."
 }

@@ -26,6 +26,9 @@ public static class NumberSeriesCodes
     public const string VehicleTransaction = "VT";
     public const string FinanceAgreement = "FA";
     public const string Document = "DOC";
+    /// <summary>Trip/Billing/Invoicing/Customer Ledger FSD §10: "auto-suggest CUS-00001" — no year segment in the
+    /// FSD's own example, so <see cref="ResetPeriods.Never"/> (matches CUS-00001, CUS-00002, ... forever).</summary>
+    public const string Customer = "CUS";
 
     public static readonly IReadOnlyList<NumberSeriesDefault> Defaults =
     [
@@ -34,6 +37,7 @@ public static class NumberSeriesCodes
         new(VehicleTransaction, "Vehicle Transaction", "VT",  6, ResetPeriods.Yearly),
         new(FinanceAgreement,   "Finance Agreement",   "FA",  4, ResetPeriods.Yearly),
         new(Document,           "Document",            "DOC", 6, ResetPeriods.Yearly),
+        new(Customer,           "Customer",            "CUS", 5, ResetPeriods.Never),
     ];
 }
 

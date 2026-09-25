@@ -67,6 +67,12 @@ The register's own instruction is "follow the repo's existing conventions" — w
 - Frontend: `npm test` (`check:access`, `check:shared`, `check:datetime`, `check:partners`, `check:vehicles`), `npm run check:colors`, `npm run check:contrast`, `npm run build` (must pass `--configuration development` for scratch-API browser checks only; plain `npm run build` for production is fine as-is).
 - No separate lint command beyond the above logic-test suites and the Angular production build (which fails on TS errors); this repo has no standalone ESLint/StyleCop gate wired into CI.
 
+## 5a. A deviation found later, recorded here for the same reason as §4 (CC-12)
+
+| FSD says (§21/§23) | Existing repo convention | Decision |
+| --- | --- | --- |
+| Trip number `TRP-YYYY-NNNNNN` — a 4-digit year | The shared `VMS.Shared.Numbering.INumberSeries`/`core.NumberSeries` mechanism every other module's number goes through (`BP-26-00147`, `CUS-00001`, ...) hard-codes a 2-digit year in `NumberFormat.Format`'s `Yearly` case, to match the *first* FSD's own convention | A small, self-contained `trp.TripNumberCounters` table + allocator, using the identical race-safe `MERGE ... WITH (UPDLOCK, HOLDLOCK)` idiom as the shared mechanism, formatting `TRP-{yyyy}-{nnnnnn}` directly. Not routed through `INumberSeries`: making the shared format's year width configurable would need a migration on the already-shipped Core module for one format quirk only this FSD asks for — lower blast radius to keep it local. |
+
 ## 6. What CC-00 found that later tasks should know
 
 - §42.9's "`GET /api/reports/{code}?filters`, one generic endpoint for all 80 report codes" (§47.2) maps cleanly onto one `ReportsController` with a `code` route parameter and one `TRP_REPORT_VIEW` permission (see §4 above) — CC-41/CC-42 do not need 80 controller actions or 80 permissions.

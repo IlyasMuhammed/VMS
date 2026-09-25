@@ -16,7 +16,13 @@
     "check:shared": "node --test scripts/check-shared.test.mjs",
     "check:partners": "node --test scripts/check-partners.test.mjs",
     "check:vehicles": "node --test scripts/check-vehicles.test.mjs",
-    "test": "npm run check:access && npm run check:shared && npm run check:datetime && npm run check:partners && npm run check:vehicles"
+    "check:customers": "node --test scripts/check-customers.test.mjs",
+    "check:cities": "node --test scripts/check-cities.test.mjs",
+    "check:routes": "node --test scripts/check-routes.test.mjs",
+    "check:trip-configurations": "node --test scripts/check-trip-configurations.test.mjs",
+    "check:fuel-cards": "node --test scripts/check-fuel-cards.test.mjs",
+    "check:trips": "node --test scripts/check-trips.test.mjs",
+    "test": "npm run check:access && npm run check:shared && npm run check:datetime && npm run check:partners && npm run check:vehicles && npm run check:customers && npm run check:cities && npm run check:routes && npm run check:trip-configurations && npm run check:fuel-cards && npm run check:trips"
   },
   "dependencies": {
     "@angular/animations": "^19.2.0",

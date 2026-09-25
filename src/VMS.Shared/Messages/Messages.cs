@@ -71,6 +71,21 @@ public static class Msg
     public const string DocNothingToRenew = "VAL-DOC-002";
     public const string DocTypeCodeInUse = "VAL-DOC-003";
 
+    // Trip/Billing/Invoicing/Customer Ledger (second FSD). No VAL-TRP-* ids are given in that FSD's own catalogue
+    // (it uses plain error codes like RATE_MISSING instead — see BusinessRuleException); these are new, for the
+    // form-validation problems this module raises the same way every other module raises theirs.
+    public const string TrpCurrencyCodeUsed = "VAL-TRP-001";
+    public const string TrpCurrencyCodeInvalid = "VAL-TRP-002";
+    public const string TrpBaseCurrencyUnknown = "VAL-TRP-003";
+    public const string TrpBaseCurrencyInactive = "VAL-TRP-004";
+    public const string TrpBaseCurrencyChangeBlocked = "VAL-TRP-005";
+    public const string TrpMultiCurrencyDisableBlocked = "VAL-TRP-006";
+    public const string TrpExchangeRateCurrencyUnknown = "VAL-TRP-007";
+    public const string TrpExchangeRateToMustBeBase = "VAL-TRP-008";
+    public const string TrpExchangeRateDuplicate = "VAL-TRP-009";
+    public const string TrpTaxRuleOverlap = "VAL-TRP-010";
+    public const string TrpRateOverlap = "VAL-TRP-011";
+
     // Platform: the checks every form has
     public const string Required = "VAL-GEN-001";
     public const string Email = "VAL-GEN-002";

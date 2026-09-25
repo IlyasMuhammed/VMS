@@ -39,6 +39,7 @@ export const DEFAULT_MESSAGES: Record<string, string> = {
   'VAL-GEN-018': '{n} other partners have this {Field}. Review them before saving.',
   'VAL-GEN-019': 'This {Field} is listed twice.',
   'VAL-GEN-020': '{n} rows match, more than the {Max} an export can hold. Narrow the filter and try again.',
+  'VAL-GEN-021': 'An Idempotency-Key header is required for this request.',
 };
 
 const PLACEHOLDER = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;

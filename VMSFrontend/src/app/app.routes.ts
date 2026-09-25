@@ -79,6 +79,67 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/vehicles/vehicle-detail.component').then((m) => m.VehicleDetailComponent),
       },
       {
+        path: 'customers',
+        ...page('Customers', { permission: 'TRP.CUSTOMER.VIEW' }, { label: 'Customers', icon: 'pi-building', section: 'Business', description: 'Who is billed for a trip: rates, tax rules, invoice templates and their balance.' }),
+        loadComponent: () => import('./pages/customers/customers.component').then((m) => m.CustomersComponent),
+      },
+      {
+        // Before `customers/:id`, so "new" is not read as an id.
+        path: 'customers/new',
+        ...page('New customer', { permission: 'TRP.CUSTOMER.EDIT' }),
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () => import('./pages/customers/customer-form.component').then((m) => m.CustomerFormComponent),
+      },
+      {
+        path: 'customers/:id',
+        ...page('Customer', { permission: 'TRP.CUSTOMER.VIEW' }),
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () => import('./pages/customers/customer-form.component').then((m) => m.CustomerFormComponent),
+      },
+      {
+        path: 'cities',
+        // §16: "all view" — every signed-in role, not gated on TRP.CITY.EDIT; the component itself gates Add/Edit on it.
+        ...page('Cities', undefined, { label: 'Cities', icon: 'pi-map-marker', section: 'Business', description: 'The city master behind every address, route and trip configuration.' }),
+        loadComponent: () => import('./pages/cities/cities.component').then((m) => m.CitiesComponent),
+      },
+      {
+        path: 'routes',
+        ...page('Routes', { permission: 'TRP.ROUTE.EDIT' }, { label: 'Routes', icon: 'pi-directions', section: 'Business', description: 'The origin, stops and destination every trip configuration is built on.' }),
+        loadComponent: () => import('./pages/routes/routes.component').then((m) => m.RoutesComponent),
+      },
+      {
+        // Before `routes/:id`, so "new" is not read as an id.
+        path: 'routes/new',
+        ...page('New route', { permission: 'TRP.ROUTE.EDIT' }),
+        loadComponent: () => import('./pages/routes/route-form.component').then((m) => m.RouteFormComponent),
+      },
+      {
+        path: 'routes/:id',
+        ...page('Route', { permission: 'TRP.ROUTE.EDIT' }),
+        loadComponent: () => import('./pages/routes/route-form.component').then((m) => m.RouteFormComponent),
+      },
+      {
+        path: 'trip-configurations',
+        ...page('Trip Configurations', { permission: 'TRP.TRIPCONFIG.VIEW' }, { label: 'Trip Configurations', icon: 'pi-sitemap', section: 'Business', description: "A customer's fixed trips: route, allowed vehicles and rates." }),
+        loadComponent: () => import('./pages/trip-configurations/trip-configurations.component').then((m) => m.TripConfigurationsComponent),
+      },
+      {
+        // Before `trip-configurations/:id`, so "new" is not read as an id.
+        path: 'trip-configurations/new',
+        ...page('New trip configuration', { permission: 'TRP.TRIPCONFIG.EDIT' }),
+        loadComponent: () => import('./pages/trip-configurations/trip-configuration-form.component').then((m) => m.TripConfigurationFormComponent),
+      },
+      {
+        path: 'trip-configurations/:id',
+        ...page('Trip configuration', { permission: 'TRP.TRIPCONFIG.VIEW' }),
+        loadComponent: () => import('./pages/trip-configurations/trip-configuration-form.component').then((m) => m.TripConfigurationFormComponent),
+      },
+      {
+        path: 'fuel-cards',
+        ...page('Fuel Cards', { permission: 'TRP.FUELCARD.EDIT' }, { label: 'Fuel Cards', icon: 'pi-credit-card', section: 'Business', description: 'Cards, their issuing company, and which vehicle or driver holds each one.' }),
+        loadComponent: () => import('./pages/fuel-cards/fuel-cards.component').then((m) => m.FuelCardsComponent),
+      },
+      {
         path: 'payables',
         ...page('Payables due', { permission: 'FIN.DUE.CONFIRM' }, { label: 'Payables due', icon: 'pi-wallet', section: 'Business', description: 'This month’s due items across the fleet, clearable in bulk.' }),
         loadComponent: () => import('./pages/payables/payables.component').then((m) => m.PayablesComponent),

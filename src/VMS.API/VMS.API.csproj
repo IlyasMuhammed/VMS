@@ -26,6 +26,7 @@
     <ProjectReference Include="..\VMS.Modules.Vehicles\VMS.Modules.Vehicles.csproj" />
     <ProjectReference Include="..\VMS.Modules.Documents\VMS.Modules.Documents.csproj" />
     <ProjectReference Include="..\VMS.Modules.Notifications\VMS.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\VMS.Modules.Trips\VMS.Modules.Trips.csproj" />
   </ItemGroup>
 
 </Project>

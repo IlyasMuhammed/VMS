@@ -120,6 +120,59 @@ public static class PermissionCodes
     public const string ADM_AUDIT_VIEW          = "ADM.AUDIT.VIEW";
     public const string ADM_CONFIG_MANAGE       = "ADM.CONFIG.MANAGE";
 
+    // ── Trips, Billing, Invoicing & Customer Ledger (second FSD; §44's dotted names mapped onto this catalogue's
+    // own MODULE_ACTION convention, the same way the first FSD's ADM.USER.MANAGE/ADM.ROLE.MANAGE were) ──────────
+    public const string TRP_CURRENCY_MANAGE     = "TRP.CURRENCY.MANAGE";
+    public const string TRP_EXCHANGERATE_MANAGE = "TRP.EXCHANGERATE.MANAGE";
+    public const string TRP_CUSTOMER_VIEW       = "TRP.CUSTOMER.VIEW";
+    public const string TRP_CUSTOMER_EDIT       = "TRP.CUSTOMER.EDIT";
+    public const string TRP_TAXRULE_EDIT        = "TRP.TAXRULE.EDIT";
+    public const string TRP_TEMPLATE_EDIT       = "TRP.TEMPLATE.EDIT";
+    public const string TRP_CITY_EDIT           = "TRP.CITY.EDIT";
+    public const string TRP_ROUTE_EDIT          = "TRP.ROUTE.EDIT";
+    public const string TRP_TRIPCONFIG_VIEW     = "TRP.TRIPCONFIG.VIEW";
+    public const string TRP_TRIPCONFIG_EDIT     = "TRP.TRIPCONFIG.EDIT";
+    public const string TRP_RATE_VIEW           = "TRP.RATE.VIEW";
+    public const string TRP_RATE_CONFIGURE      = "TRP.RATE.CONFIGURE";
+    public const string TRP_RATE_REPRICE        = "TRP.RATE.REPRICE";
+    public const string TRP_TRIP_VIEW           = "TRP.TRIP.VIEW";
+    public const string TRP_TRIP_CREATE         = "TRP.TRIP.CREATE";
+    public const string TRP_TRIP_EDIT           = "TRP.TRIP.EDIT";
+    public const string TRP_TRIP_STATUS         = "TRP.TRIP.STATUS";
+    public const string TRP_TRIP_INACTIVATE     = "TRP.TRIP.INACTIVATE";
+    public const string TRP_TRIP_SKIPSTATUS     = "TRP.TRIP.SKIPSTATUS";
+    public const string TRP_TRIP_REOPEN         = "TRP.TRIP.REOPEN";
+    public const string TRP_TRIP_DOCUMENTS      = "TRP.TRIP.DOCUMENTS";
+    public const string TRP_TRIP_REVIEW         = "TRP.TRIP.REVIEW";
+    public const string TRP_TRIP_OVERRIDE_DRIVER = "TRP.TRIP.OVERRIDEDRIVER";
+    public const string TRP_POD_APPROVE         = "TRP.POD.APPROVE";
+    public const string TRP_EXPENSE_EDIT        = "TRP.EXPENSE.EDIT";
+    public const string TRP_EXPENSE_APPROVE     = "TRP.EXPENSE.APPROVE";
+    public const string TRP_FUEL_EDIT           = "TRP.FUEL.EDIT";
+    public const string TRP_INCOME_EDIT         = "TRP.INCOME.EDIT";
+    public const string TRP_PNL_VIEW            = "TRP.PNL.VIEW";
+    public const string TRP_FUELCARD_EDIT       = "TRP.FUELCARD.EDIT";
+    public const string TRP_INVOICE_GENERATE    = "TRP.INVOICE.GENERATE";
+    public const string TRP_INVOICE_VIEW        = "TRP.INVOICE.VIEW";
+    public const string TRP_INVOICE_SUBMIT      = "TRP.INVOICE.SUBMIT";
+    public const string TRP_INVOICE_CANCEL      = "TRP.INVOICE.CANCEL";
+    public const string TRP_INVOICE_REGENERATE  = "TRP.INVOICE.REGENERATE";
+    public const string TRP_INVOICE_RERENDER    = "TRP.INVOICE.RERENDER";
+    public const string TRP_INVOICE_EVIDENCE_RETRY    = "TRP.INVOICE.EVIDENCE.RETRY";
+    public const string TRP_INVOICE_EVIDENCE_RERENDER = "TRP.INVOICE.EVIDENCE.RERENDER";
+    public const string TRP_BANKACCOUNT_MANAGE  = "TRP.BANKACCOUNT.MANAGE";
+    public const string TRP_PAYMENT_CREATE      = "TRP.PAYMENT.CREATE";
+    public const string TRP_PAYMENT_REVERSE     = "TRP.PAYMENT.REVERSE";
+    public const string TRP_PAYMENT_CARRYFORWARD = "TRP.PAYMENT.CARRYFORWARD";
+    public const string TRP_PAYMENT_REFUND      = "TRP.PAYMENT.REFUND";
+    public const string TRP_PAYMENT_WRITEOFF    = "TRP.PAYMENT.WRITEOFF";
+    public const string TRP_PAYMENT_DISCOUNT    = "TRP.PAYMENT.DISCOUNT";
+    public const string TRP_PAYMENT_ADVANCE     = "TRP.PAYMENT.ADVANCE";
+    public const string TRP_LEDGER_VIEW         = "TRP.LEDGER.VIEW";
+    public const string TRP_LEDGER_OPENINGBALANCE = "TRP.LEDGER.OPENINGBALANCE";
+    public const string TRP_LEDGER_PERIODLOCK   = "TRP.LEDGER.PERIODLOCK";
+    public const string TRP_REPORT_VIEW         = "TRP.REPORT.VIEW";
+
     public sealed record Definition(string Code, string Name, string Module, string Description, string Level = PermissionLevels.Operation);
 
     private const string Users = "User Management";
@@ -129,6 +182,9 @@ public static class PermissionCodes
     private const string Finance = "Financial";
     private const string Documents = "Documents";
     private const string Admin = "Administration";
+    private const string Trips = "Trips";
+    private const string Billing = "Billing and Invoicing";
+    private const string Ledger = "Customer Ledger";
 
     private const string I = PermissionLevels.Interface;
     private const string O = PermissionLevels.Operation;
@@ -196,5 +252,58 @@ public static class PermissionCodes
         new(ADM_SERIES_MANAGE,       "Manage numbering series",      Admin, "Numbering series.", O),
         new(ADM_AUDIT_VIEW,          "View the audit log",           Admin, "The audit log viewer.", I),
         new(ADM_CONFIG_MANAGE,       "Manage system configuration",  Admin, "System configuration switches.", O),
+
+        new(TRP_CURRENCY_MANAGE,     "Manage currency setup",         Trips, "The currency master and the tenant's multi-currency setting (§44: Admin only).", O),
+        new(TRP_EXCHANGERATE_MANAGE, "Manage exchange rates",         Trips, "Exchange rates (§44: Admin, or Finance if granted).", O),
+        new(TRP_CUSTOMER_VIEW,       "View customers",                Trips, "Customer list and customer screen.", I),
+        new(TRP_CUSTOMER_EDIT,       "Edit customers",                Trips, "Create and edit a customer, its contacts, addresses and billing configuration.", O),
+        new(TRP_TAXRULE_EDIT,        "Edit tax/deduction rules",      Trips, "A customer's tax and deduction rules.", O),
+        new(TRP_TEMPLATE_EDIT,       "Edit invoice templates",        Trips, "A customer's invoice template registry.", O),
+        new(TRP_CITY_EDIT,           "Edit cities",                   Trips, "The city master.", O),
+        new(TRP_ROUTE_EDIT,          "Edit routes",                   Trips, "Routes and route stops.", O),
+        new(TRP_TRIPCONFIG_VIEW,     "View trip configurations",      Trips, "§44: Admin/Fleet Manager edit, Operations/Finance view.", I),
+        new(TRP_TRIPCONFIG_EDIT,     "Edit trip configurations",      Trips, "A customer's trip configurations, stops and allowed vehicles.", O),
+        new(TRP_RATE_VIEW,           "View trip rates",               Trips, "§44: Admin, Finance, Fleet Manager and Read Only view; Operations sees only the amount on a trip.", I),
+        new(TRP_RATE_CONFIGURE,      "Configure trip rates",          Trips, "Effective-dated trip rates.", O),
+        new(TRP_RATE_REPRICE,        "Re-price trips",                Trips, "Resolve missing rates and re-price already-rated trips.", O),
+        new(TRP_TRIP_VIEW,           "View trips",                    Trips, "Trip list and trip screen.", I),
+        new(TRP_TRIP_CREATE,         "Create trips",                  Trips, "Create a fixed or open trip.", O),
+        new(TRP_TRIP_EDIT,           "Edit trips",                    Trips, "Edit a trip before it is invoiced.", O),
+        new(TRP_TRIP_STATUS,         "Change trip status",            Trips, "Trip lifecycle transitions, events and issues.", O),
+        new(TRP_TRIP_INACTIVATE,     "Inactivate trips",              Trips, "Mark a trip inactive or reactivate it, with a reason.", O),
+        new(TRP_TRIP_SKIPSTATUS,     "Skip lifecycle steps",          Trips, "Jump a trip's status past steps the transition table does not directly allow (§24, back-dated entry).", O),
+        new(TRP_TRIP_REOPEN,         "Reopen completed trips",        Trips, "Move a Completed trip back to Delivered, if it is not on an active invoice.", O),
+        new(TRP_TRIP_DOCUMENTS,      "Manage trip documents",         Trips, "Upload trip documents and proof of delivery.", O),
+        new(TRP_TRIP_REVIEW,         "Review driver-created trips",   Trips, "Release or reject a trip a driver created in the app.", O),
+        new(TRP_TRIP_OVERRIDE_DRIVER,"Override the assigned driver",  Trips, "Change a trip's driver away from the vehicle's own default (§20).", O),
+        new(TRP_POD_APPROVE,         "Approve proof of delivery",     Trips, "Approve a trip's proof of delivery.", O),
+        new(TRP_EXPENSE_EDIT,        "Edit trip expenses",            Trips, "Add or void a trip expense.", O),
+        new(TRP_EXPENSE_APPROVE,     "Approve trip expenses",         Trips, "Approve a driver-app expense.", O),
+        new(TRP_FUEL_EDIT,           "Edit trip fuel",                Trips, "Add or void trip fuel.", O),
+        new(TRP_INCOME_EDIT,         "Edit trip income",              Trips, "Add trip income, billable or not.", O),
+        new(TRP_PNL_VIEW,            "View trip P&L",                 Trips, "A trip's operational profit and loss.", I),
+        new(TRP_FUELCARD_EDIT,       "Edit fuel cards",                Trips, "Fuel cards and their vehicle assignments.", O),
+
+        new(TRP_INVOICE_GENERATE,    "Generate invoices",             Billing, "Search eligible trips and create an invoice.", O),
+        new(TRP_INVOICE_VIEW,        "View invoices",                 Billing, "Invoice list, detail, lines and evidence.", I),
+        new(TRP_INVOICE_SUBMIT,      "Submit invoices",               Billing, "Submit a Generated invoice.", O),
+        new(TRP_INVOICE_CANCEL,      "Cancel invoices",               Billing, "Cancel a submitted invoice, with a reason.", O),
+        new(TRP_INVOICE_REGENERATE,  "Regenerate invoices",           Billing, "Regenerate an invoice, transferring its payments.", O),
+        new(TRP_INVOICE_RERENDER,    "Re-render invoice PDF",         Billing, "§34: re-render an invoice's PDF as a new version, without altering its data. Admin-only.", O),
+        new(TRP_INVOICE_EVIDENCE_RETRY,    "Retry invoice evidence",  Billing, "§41: retry a failed invoice evidence generation. Finance.", O),
+        new(TRP_INVOICE_EVIDENCE_RERENDER, "Re-render invoice evidence", Billing, "§41: re-render invoice evidence as a new version. Admin-only.", O),
+        new(TRP_BANKACCOUNT_MANAGE,  "Manage bank accounts",          Billing, "§37: create and update the company's own bank accounts that receive customer payments.", O),
+        new(TRP_PAYMENT_CREATE,      "Record payments",               Billing, "Record a customer receipt against one or more invoices.", O),
+        new(TRP_PAYMENT_REVERSE,     "Reverse payments",               Billing, "Reverse a recorded payment, with a reason.", O),
+        new(TRP_PAYMENT_CARRYFORWARD,"Carry forward credit",          Billing, "Carry a negative invoice balance forward to another invoice.", O),
+        new(TRP_PAYMENT_REFUND,      "Refund credit",                 Billing, "Refund a customer credit or advance.", O),
+        new(TRP_PAYMENT_WRITEOFF,    "Write off balances",            Billing, "Write off an invoice's remaining balance.", O),
+        new(TRP_PAYMENT_DISCOUNT,    "Discount balances",             Billing, "Discount an invoice's remaining balance.", O),
+        new(TRP_PAYMENT_ADVANCE,     "Record advances",               Billing, "Record, move or refund an advance against an Open trip.", O),
+
+        new(TRP_LEDGER_VIEW,             "View the customer ledger",  Ledger, "Ledger statement, invoice ledger and balances.", I),
+        new(TRP_LEDGER_OPENINGBALANCE,   "Post opening balances",     Ledger, "A customer's go-live opening balance.", O),
+        new(TRP_LEDGER_PERIODLOCK,       "Lock ledger periods",       Ledger, "Close or reopen a ledger period.", O),
+        new(TRP_REPORT_VIEW,             "View trip/billing reports", Ledger, "Every report and dashboard in this module (one permission covers all report codes, matching FIN.REPORT.VIEW/DOC.REGISTER.VIEW's existing generic pattern).", I),
     ];
 }

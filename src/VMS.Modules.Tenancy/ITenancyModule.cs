@@ -32,6 +32,7 @@ public static class TenancyModuleExtensions
         services.AddScoped<ISuperAdminService, SuperAdminService>();
         services.AddScoped<ITenantSnapshotProvider, TenantSnapshotProvider>();
         services.AddScoped<ITenantDirectory, TenantDirectory>();
+        services.AddScoped<ITenantProfileDirectory, TenantDirectory>();
         services.AddScoped<TenancyDataSeeder>();
 
         return services;

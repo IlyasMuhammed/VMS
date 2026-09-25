@@ -11,9 +11,19 @@ public sealed class PermissionCatalogueTests(ApiFactory factory)
     private static readonly string[] ValidLevels = [PermissionLevels.Interface, PermissionLevels.Operation, PermissionLevels.Field];
 
     [Fact]
-    public void Catalogue_holds_the_fifty_five_permissions_the_register_calls_for()
+    public void Catalogue_holds_the_one_hundred_and_five_permissions_the_register_calls_for()
     {
-        Assert.Equal(55, PermissionCodes.Catalog.Count);
+        // 55 from the Business Partner/Vehicle FSD's register, plus 39 TRP.* codes added for the
+        // Trip/Billing/Invoicing/Customer Ledger module's CC-01 (permission constants for every §44 action),
+        // plus 2 more (TRP.CURRENCY.MANAGE, TRP.EXCHANGERATE.MANAGE) found while building CC-02,
+        // plus 1 more (TRP.TRIPCONFIG.VIEW) found while building CC-10,
+        // plus 1 more (TRP.RATE.VIEW) found while building CC-11,
+        // plus 1 more (TRP.TRIP.OVERRIDEDRIVER) found while building CC-14,
+        // plus 2 more (TRP.TRIP.SKIPSTATUS, TRP.TRIP.REOPEN) found while building CC-15,
+        // plus 1 more (TRP.INVOICE.RERENDER) found while building CC-27,
+        // plus 2 more (TRP.INVOICE.EVIDENCE.RETRY, TRP.INVOICE.EVIDENCE.RERENDER) found while building CC-28,
+        // plus 1 more (TRP.BANKACCOUNT.MANAGE) found while building CC-31.
+        Assert.Equal(105, PermissionCodes.Catalog.Count);
     }
 
     [Fact]
@@ -51,7 +61,7 @@ public sealed class PermissionCatalogueTests(ApiFactory factory)
     {
         factory.CreateClient();
 
-        Assert.Equal(55, factory.Scalar<int>("SELECT COUNT(*) FROM auth.Permissions"));
+        Assert.Equal(105, factory.Scalar<int>("SELECT COUNT(*) FROM auth.Permissions"));
         Assert.Equal(PermissionCodes.Catalog.Count(d => d.Level == PermissionLevels.Field),
             factory.Scalar<int>("SELECT COUNT(*) FROM auth.Permissions WHERE Level = 'Field'"));
         Assert.Equal("Field", factory.Scalar<string>("SELECT Level FROM auth.Permissions WHERE Code = 'VEH.FIELD.COST.VIEW'"));
@@ -67,8 +77,8 @@ public sealed class PermissionCatalogueTests(ApiFactory factory)
             "SELECT COUNT(*) FROM auth.RolePermissions rp JOIN auth.Roles r ON r.RoleID = rp.RoleID WHERE r.IsGlobal = 1 AND r.RoleCode = @c",
             ("@c", roleCode));
 
-        Assert.Equal(55, Held("SUPER_ADMIN"));
-        Assert.Equal(55, Held("TENANT_ADMIN"));
+        Assert.Equal(105, Held("SUPER_ADMIN"));
+        Assert.Equal(105, Held("TENANT_ADMIN"));
         Assert.Equal(2, Held("MANAGER"));
         Assert.Equal(0, Held("STAFF"));
     }

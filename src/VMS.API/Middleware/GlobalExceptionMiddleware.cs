@@ -14,9 +14,11 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    /// <summary>The same id every audit row from this request carries, so a report can be matched back to the trail.</summary>
+    /// <summary>The same id every audit row from this request carries, so a report can be matched back to the trail.
+    /// Null-safe: a unit test that drives this middleware directly (<see cref="DefaultHttpContext"/>, no DI container)
+    /// has no <see cref="HttpContext.RequestServices"/> at all, not merely a missing registration.</summary>
     private static string? CorrelationId(HttpContext context) =>
-        context.RequestServices.GetService<IAuditContext>()?.GroupId.ToString();
+        context.RequestServices?.GetService<IAuditContext>()?.GroupId.ToString();
 
     public async Task InvokeAsync(HttpContext context)
     {

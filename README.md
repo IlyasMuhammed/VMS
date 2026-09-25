@@ -488,6 +488,28 @@ and `VMSFrontend/src/app/layout/notification-bell.component.ts` (the shell's own
   loops every active tenant through `INotificationEvaluator.RunAsync`, on demand via `POST /api/admin/jobs/notifications/run`
   (`ADM.CONFIG.MANAGE`).
 
+## Trips, Billing, Invoicing & Customer Ledger (in progress)
+
+A second, separate FSD's module (`Document/VMS — Trip Management, Customer Billing, Invoicing & Customer Ledger —
+FSD (Phase 1).md`), being built from its own task register (`Document/TASKS.md`, CC-00..CC-46), independently of the
+Business Partner/Vehicle register above. New module, `VMS.Modules.Trips`, schema `trp` — deliberately **one** module
+for Customer/City/Route/TripConfig/Rate/Trip/Invoice/Payment/Ledger, not several, because the FSD's own rule that
+every ledger entry posts in the same DB transaction as its cause is what one `DbContext` gives for free.
+
+- Only the cross-cutting scaffold exists so far (CC-01): permission codes (`TRP.*`, 39 of them, one generic
+  `TRP.REPORT.VIEW` rather than one per report code), and a genuinely new capability nothing else in this repo had —
+  an `Idempotency-Key` store (`[Idempotent]`, `IIdempotencyStore`, scoped to this module's own schema) for the FSD's
+  own requirement that a retried POST which creates money or a ledger row returns its first response rather than
+  running twice.
+- Three additive, non-breaking extensions to shared infra every module now benefits from: `ApiResponse.Code`/
+  `CorrelationId` (nullable; existing responses are unchanged), a `BusinessRuleException` → 422 for a business-rule
+  refusal with a machine-readable code (`RATE_MISSING`, etc., as later tasks add them), and a
+  `ConcurrencyConflictException` so a stale-row 409 can carry `CONCURRENCY_CONFLICT` without relabelling the many
+  other, non-concurrency uses of the pre-existing generic `ConflictException`.
+- See `Document/VMS-TripBilling-Implementation-Notes.md` for the full set of decisions (module boundary, reused
+  entities, and every place this new FSD's literal API conventions were deliberately adapted to the 8 already-shipped
+  stages' own conventions instead) and `Document/TASKS.md` for progress.
+
 ## Changing the database model
 
 ```powershell

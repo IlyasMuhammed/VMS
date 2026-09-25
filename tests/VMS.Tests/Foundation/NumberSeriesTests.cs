@@ -240,7 +240,7 @@ public sealed class NumberSeriesTests(ApiFactory factory)
         var list = await (await admin.GetAsync("/api/admin/number-series")).DataAsync();
 
         var codes = list.EnumerateArray().Select(s => s.GetProperty("code").GetString()).ToList();
-        Assert.Equal(["BP", "VH", "VT", "FA", "DOC"], codes);
+        Assert.Equal(["BP", "VH", "VT", "FA", "DOC", "CUS"], codes);
         var bp = list.EnumerateArray().First(s => s.GetProperty("code").GetString() == "BP");
         Assert.Equal("Business Partner", bp.GetProperty("entity").GetString());
         Assert.Equal(5, bp.GetProperty("padding").GetInt32());

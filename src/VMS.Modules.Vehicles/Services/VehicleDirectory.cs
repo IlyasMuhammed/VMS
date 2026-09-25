@@ -18,15 +18,15 @@ internal sealed class VehicleDirectory(VehicleDbContext db, ITenantContext tenan
 
         var tenant = tenantContext.TenantId;
         var rows = await db.Vehicles.AsNoTracking().Where(v => v.TenantId == tenant && !v.IsDeleted && ids.Contains(v.VehicleId))
-            .Select(v => new { v.VehicleId, v.VehicleCode, v.RegistrationNo }).ToListAsync(cancellationToken);
-        return rows.ToDictionary(v => v.VehicleId, v => new VehicleInfo(v.VehicleId, v.VehicleCode, v.RegistrationNo));
+            .Select(v => new { v.VehicleId, v.VehicleCode, v.RegistrationNo, v.IsInFleet, v.CurrentCategory, v.DefaultDriverId }).ToListAsync(cancellationToken);
+        return rows.ToDictionary(v => v.VehicleId, v => new VehicleInfo(v.VehicleId, v.VehicleCode, v.RegistrationNo, v.IsInFleet, v.CurrentCategory, v.DefaultDriverId));
     }
 
     public async Task<IReadOnlyList<VehicleInfo>> AllAsync(CancellationToken cancellationToken = default)
     {
         var tenant = tenantContext.TenantId;
         var rows = await db.Vehicles.AsNoTracking().Where(v => v.TenantId == tenant && !v.IsDeleted)
-            .Select(v => new { v.VehicleId, v.VehicleCode, v.RegistrationNo }).ToListAsync(cancellationToken);
-        return rows.Select(v => new VehicleInfo(v.VehicleId, v.VehicleCode, v.RegistrationNo)).ToList();
+            .Select(v => new { v.VehicleId, v.VehicleCode, v.RegistrationNo, v.IsInFleet, v.CurrentCategory, v.DefaultDriverId }).ToListAsync(cancellationToken);
+        return rows.Select(v => new VehicleInfo(v.VehicleId, v.VehicleCode, v.RegistrationNo, v.IsInFleet, v.CurrentCategory, v.DefaultDriverId)).ToList();
     }
 }

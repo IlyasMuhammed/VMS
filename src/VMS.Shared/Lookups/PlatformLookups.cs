@@ -20,6 +20,9 @@ public static class PlatformLookups
     public const string RecurringChargeType = "RECURRING_CHARGE_TYPE";
     public const string Province = "PROVINCE";
     public const string City = "CITY";
+    public const string Country = "COUNTRY";
+    public const string TripExpenseType = "TRIP_EXPENSE_TYPE";
+    public const string TripIncomeType = "TRIP_INCOME_TYPE";
 
     /// <summary>Codes are the description in capitals with underscores, so a seed reads at a glance.</summary>
     private static string CodeOf(string description) =>
@@ -110,6 +113,22 @@ public static class PlatformLookups
         new(City, "City", "Cities, each in a province.",
             [new LookupAttribute("province", "Province", LookupAttributeKind.Lookup, Required: true, LookupType: Province)],
             Cities),
+
+        // Trip/Billing/Invoicing/Customer Ledger FSD §10: Customer.CountryId, "Default Pakistan". A tenant adds
+        // more only if it actually bills a customer registered outside Pakistan.
+        new(Country, "Country", "A customer's registered country.",
+            Defaults: Seeds("Pakistan")),
+
+        // Trip/Billing/Invoicing/Customer Ledger FSD §29: "extensible" — Fuel is seeded for completeness (the
+        // FSD's own literal list) but never a valid choice on a new TripExpense (CC-20's own service refuses it —
+        // "use the Fuel screen" is enforced there, not by leaving it out of the list a tenant could otherwise edit).
+        new(TripExpenseType, "Trip Expense Type", "What a trip expense was for.",
+            Defaults: Seeds("Fuel", "Toll Tax", "Traffic Challan", "Vehicle Service", "Tyre Air Check", "Parking", "Loading/Unloading", "Driver Expense", "Repair", "Other")),
+
+        // Trip/Billing/Invoicing/Customer Ledger FSD §30: additional operational revenue attached to a trip —
+        // its own list, distinct from the Vehicle module's existing IncomeType ("Monthly hire", "Rental income", …).
+        new(TripIncomeType, "Trip Income Type", "Where a trip's additional income came from.",
+            Defaults: Seeds("Detention", "Extra Drop", "Loading Recovery", "Other")),
     ];
 
     private static IReadOnlyList<LookupSeed> Cities => PakistaniCities.Select(x => CitySeed(x.City, CodeOf(x.Province))).ToList();

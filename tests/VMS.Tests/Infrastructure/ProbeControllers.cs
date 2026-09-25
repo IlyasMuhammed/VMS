@@ -149,6 +149,31 @@ public sealed class LookupProbeController(VMS.Shared.Lookups.ILookupReader looku
         });
 }
 
+public sealed class IdempotentEchoBody
+{
+    public string Note { get; set; } = string.Empty;
+}
+
+/// <summary>Proves the Trips module's <c>[Idempotent]</c> filter (CC-01): a replay with the same key and the same
+/// body returns the first call's own result, unrun; a different body under the same key is refused; a missing
+/// header is refused. Used only by tests.</summary>
+[ApiController]
+[Route("test/idempotent")]
+[AuthenticatedOnly]
+public sealed class IdempotentProbeController : ControllerBase
+{
+    [HttpPost]
+    [VMS.Modules.Trips.Services.Idempotent]
+    public IActionResult Post([FromBody] IdempotentEchoBody body) =>
+        Ok(ApiResponse<object>.Ok(new { ran = Guid.NewGuid(), body.Note }));
+
+    /// <summary>Gated by a permission nobody in these tests holds, so a 403 can be proven without needing a
+    /// probe controller that has no permission-checked action at all.</summary>
+    [HttpGet("restricted")]
+    [RequirePermission(PermissionCodes.TRP_LEDGER_PERIODLOCK)]
+    public IActionResult Restricted() => Ok(ApiResponse.Ok());
+}
+
 /// <summary>An endpoint that forgot to say how it is protected. Must stop the application starting.</summary>
 [ApiController]
 [Route("test/unprotected")]

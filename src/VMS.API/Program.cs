@@ -13,6 +13,7 @@ using VMS.Modules.Core;
 using VMS.Modules.Documents;
 using VMS.Modules.Notifications;
 using VMS.Modules.Tenancy;
+using VMS.Modules.Trips;
 using VMS.Modules.Vehicles;
 using VMS.Shared.Auditing;
 using VMS.Shared.Authorization;
@@ -99,6 +100,7 @@ builder.Services.AddBusinessPartnersModule(builder.Configuration);
 builder.Services.AddDocumentsModule(builder.Configuration);   // before Vehicles: its IVehicleDocumentCheck must pre-empt the vehicle module's no-op stand-in
 builder.Services.AddVehiclesModule(builder.Configuration);
 builder.Services.AddNotificationsModule(builder.Configuration);   // after Documents and Vehicles: its evaluator resolves their IDocumentNotificationSource/IVehicleNotificationSource by DI
+builder.Services.AddTripsModule(builder.Configuration);   // after BusinessPartners/Vehicles: reads IPartnerDirectory/IVehicleDirectory (second FSD, CC-01)
 
 // ── JWT authentication ───────────────────────────────────────────────────────
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Secret));
@@ -183,6 +185,7 @@ app.UseBusinessPartnersModule(); // migrates the bp schema
 app.UseDocumentsModule();        // migrates the doc schema
 app.UseVehiclesModule();         // migrates the veh schema
 app.UseNotificationsModule();    // migrates the notif schema
+app.UseTripsModule();            // migrates the trp schema (second FSD, CC-01)
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapControllers();
