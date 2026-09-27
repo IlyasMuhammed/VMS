@@ -3,14 +3,29 @@ using System.Text;
 
 namespace VMS.Modules.Core.Files;
 
+/// <summary>Which <see cref="IFileStore"/> is registered for <c>FileStorage:Provider</c>. Only <see cref="Local"/>
+/// is implemented today; <see cref="Blob"/> is reserved so switching to it later is a config change, not a
+/// rewrite — everything that stores or reads a file already goes through <see cref="IFileStore"/>, never a path.</summary>
+public static class FileStorageProviders
+{
+    public const string Local = "Local";
+    public const string Blob = "Blob";
+    public static readonly string[] All = [Local, Blob];
+}
+
 /// <summary>Configuration section <c>FileStorage</c>.</summary>
 public sealed class FileStorageOptions
 {
     public const string Section = "FileStorage";
 
+    /// <summary>Which backend stores the files: <see cref="FileStorageProviders.Local"/> (the only one working
+    /// right now) or <see cref="FileStorageProviders.Blob"/> (reserved — there is no blob account to point it at
+    /// yet, so choosing it fails fast at startup instead of silently falling back to disk).</summary>
+    public string Provider { get; set; } = FileStorageProviders.Local;
+
     /// <summary>
     /// Folder the files live in, outside the database and outside the web root. Required outside
-    /// Development. Back it up with the database: the two belong together.
+    /// Development. Back it up with the database: the two belong together. Local provider only.
     /// </summary>
     public string? RootPath { get; set; }
 
@@ -30,6 +45,11 @@ public sealed class FileStorageOptions
     /// <summary>Stops the application starting with storage that would lose or expose files.</summary>
     public void Validate(bool isDevelopment)
     {
+        if (!FileStorageProviders.All.Contains(Provider, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"FileStorage:Provider must be one of: {string.Join(", ", FileStorageProviders.All)}.");
+        if (string.Equals(Provider, FileStorageProviders.Blob, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("FileStorage:Provider is set to Blob, but no blob storage account is available yet. Set it to Local for now.");
+
         if (MaxBytes < 1) throw new InvalidOperationException("FileStorage:MaxBytes must be positive.");
 
         if (!isDevelopment && string.IsNullOrWhiteSpace(RootPath))

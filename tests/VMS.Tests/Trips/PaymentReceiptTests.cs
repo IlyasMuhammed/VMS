@@ -173,6 +173,9 @@ public sealed class PaymentReceiptTests(ApiFactory factory)
         var reloaded = await (await admin.GetAsync($"/api/invoices/{invoiceId}")).DataAsync();
         Assert.Equal(300000, reloaded.GetProperty("balanceAmount").GetDecimal());
         Assert.Equal("PartiallyPaid", reloaded.GetProperty("paymentStatus").GetString());
+        // AC-35: status and payment status are separate fields — Submitted here says nothing about payment,
+        // just as Unpaid (§InvoiceSubmissionTests.AC_55) says nothing about submission.
+        Assert.Equal("Submitted", reloaded.GetProperty("status").GetString());
     }
 
     [Fact]
@@ -369,5 +372,38 @@ public sealed class PaymentReceiptTests(ApiFactory factory)
         {
             accountTitle = "X", bankName = "X", branchName = "X", accountNumberLast4 = "0000"
         })).StatusCode);
+    }
+
+    /// <summary>CC-44's own Receipts List (§48.5) — the first test of the first list/search endpoint this
+    /// module has ever had for receipts, the same gap CC-43/44 closed for trips and invoices.</summary>
+    [Fact]
+    public async Task Search_filters_by_customer_and_resolves_the_invoice_number()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerId = await ReadyCustomerAsync(admin);
+        var invoice = await ReadySubmittedInvoiceAsync(factory, vehicles, admin, customerId);
+        var invoiceId = invoice.GetProperty("invoiceId").GetInt64();
+        var bankAccountId = await ReadyBankAccountAsync(admin);
+
+        var created = await (await admin.PostAsJsonAsync($"/api/invoices/{invoiceId}/payments", new
+        {
+            receiptDate = Day(), amount = 1000, paymentMethod = "DirectToAccount", bankCashAccountId = bankAccountId, instrumentNo = "SEARCH-1"
+        })).DataAsync();
+
+        var otherCustomerId = await ReadyCustomerAsync(admin);
+
+        var page = await (await admin.GetAsync($"/api/customer-receipts/search?customerId={customerId}")).DataAsync();
+        var items = page.GetProperty("items").EnumerateArray().ToList();
+        var row = Assert.Single(items);
+        Assert.Equal(created.GetProperty("customerReceiptId").GetInt64(), row.GetProperty("customerReceiptId").GetInt64());
+        Assert.False(string.IsNullOrEmpty(row.GetProperty("customerName").GetString()));
+        Assert.Contains(invoice.GetProperty("invoiceNumber").GetString(), row.GetProperty("invoiceNumbers").EnumerateArray().Select(e => e.GetString()));
+
+        var forOther = await (await admin.GetAsync($"/api/customer-receipts/search?customerId={otherCustomerId}")).DataAsync();
+        Assert.Empty(forOther.GetProperty("items").EnumerateArray());
+
+        var single = await (await admin.GetAsync($"/api/customer-receipts/{created.GetProperty("customerReceiptId").GetInt64()}")).DataAsync();
+        var allocation = Assert.Single(single.GetProperty("allocations").EnumerateArray());
+        Assert.Equal(invoiceId, allocation.GetProperty("invoiceId").GetInt64());
     }
 }

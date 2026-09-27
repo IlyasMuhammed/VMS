@@ -20,6 +20,7 @@ public sealed class TripFuelModel
     public string? Remarks { get; set; }
     public string CurrencyCode { get; set; } = string.Empty;
     public string Source { get; set; } = string.Empty;
+    public Guid? ClientEventId { get; set; }
     public bool IsVoided { get; set; }
     public string? VoidReason { get; set; }
     public int? VoidedBy { get; set; }
@@ -47,6 +48,10 @@ public sealed class CreateTripFuelRequest
     public string? Remarks { get; set; }
     /// <summary>Only read when multi-currency is on (§13A/AC-65); forced to the tenant base otherwise.</summary>
     public string? CurrencyCode { get; set; }
+    /// <summary>§43/AC-54: a retried offline sync with the same id is answered with the original entry, not a
+    /// duplicate — the same mechanism <c>CreateTripEventRequest.ClientEventId</c> already established. Null
+    /// (the ordinary case) for anything logged with a live connection.</summary>
+    public Guid? ClientEventId { get; set; }
 }
 
 public sealed class VoidTripFuelRequest

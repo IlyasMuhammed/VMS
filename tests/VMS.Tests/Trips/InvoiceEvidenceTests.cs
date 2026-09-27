@@ -12,10 +12,10 @@ using Xunit;
 
 namespace VMS.Tests.Trips;
 
-/// <summary>CC-28: invoice evidence, standard layout, vehicle pagination (§41, AC-33, AC-67). AC-34 (a
-/// regenerated invoice's own old evidence staying unchanged) genuinely needs invoice regeneration, which is
-/// CC-35's own job — not testable here; the underlying "snapshots only" mechanism this task relies on is instead
-/// proven by determinism (re-deriving the same metadata twice from the same immutable InvoiceLine rows).</summary>
+/// <summary>CC-28: invoice evidence, standard layout, vehicle pagination (§41, AC-33, AC-34, AC-67). AC-34 (a
+/// regenerated invoice's own old evidence staying unchanged) needed invoice regeneration, CC-35's own later job
+/// — now built, so it is tested directly below rather than left to the "proven by determinism" fallback this
+/// file's own doc comment used to rely on.</summary>
 [Collection(ApiCollection.Name)]
 public sealed class InvoiceEvidenceTests(ApiFactory factory)
 {
@@ -26,7 +26,7 @@ public sealed class InvoiceEvidenceTests(ApiFactory factory)
         var vehicles = await VehicleWorld.CreateAsync(factory);
         var admin = vehicles.As("Combined Admin", 1,
             [.. VehicleWorld.VehiclePermissions, .. PartnerWorld.Everything, .. TripsWorld.Everything,
-             PermissionCodes.TRP_INVOICE_GENERATE, PermissionCodes.TRP_INVOICE_VIEW,
+             PermissionCodes.TRP_INVOICE_GENERATE, PermissionCodes.TRP_INVOICE_VIEW, PermissionCodes.TRP_INVOICE_REGENERATE,
              PermissionCodes.TRP_INVOICE_EVIDENCE_RETRY, PermissionCodes.TRP_INVOICE_EVIDENCE_RERENDER]);
         return (vehicles, admin);
     }
@@ -122,6 +122,38 @@ public sealed class InvoiceEvidenceTests(ApiFactory factory)
         Assert.Single(vehiclePages);
         Assert.Equal(1, vehiclePages[0].GetProperty("firstPage").GetInt32());
         Assert.Equal(1, vehiclePages[0].GetProperty("lastPage").GetInt32());
+    }
+
+    [Fact]
+    public async Task AC_34_a_regenerated_invoices_own_evidence_keeps_the_old_rate_and_the_new_one_gets_its_own()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerId = await ReadyCustomerAsync(admin);
+        var truck = VehicleWorld.Id(await vehicles.ActiveAsync());
+        var driverId = await vehicles.DriverAsync();
+        var configId = await ReadyConfigAsync(admin, customerId, truck, 25000, "Evidence Integrity Route");
+        var tripId = await CompleteTripAsync(admin, customerId, configId, truck, driverId, "2026-07-10");
+        var v1 = await (await admin.PostAsJsonAsync("/api/invoices", new { customerId, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { tripId } })).DataAsync();
+        var v1Id = v1.GetProperty("invoiceId").GetInt64();
+        Assert.Equal(1, await ProcessQueuedEvidenceAsync(factory, vehicles.Tenant));
+
+        var v1Evidence = (await (await admin.GetAsync($"/api/invoices/{v1Id}/evidence")).DataAsync())[0];
+        Assert.Equal(25000, v1Evidence.GetProperty("vehiclePages")[0].GetProperty("subtotal").GetDecimal());
+
+        // §38's own "historical integrity example": the rate is corrected after the fact, then the invoice is
+        // regenerated with re-pricing.
+        factory.Execute("UPDATE trp.TripRates SET RateAmount = 30000 WHERE TripConfigurationId = @configId", ("@configId", configId));
+        var regenerated = await (await admin.PostAsJsonAsync($"/api/invoices/{v1Id}/regenerate", new
+        {
+            periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { tripId }, repriceTrips = true, regenerationReason = "Rate correction"
+        })).DataAsync();
+        var v2Id = regenerated.GetProperty("invoice").GetProperty("invoiceId").GetInt64();
+        Assert.Equal(1, await ProcessQueuedEvidenceAsync(factory, vehicles.Tenant));
+
+        var v1Reloaded = (await (await admin.GetAsync($"/api/invoices/{v1Id}/evidence")).DataAsync())[0];
+        var v2Evidence = (await (await admin.GetAsync($"/api/invoices/{v2Id}/evidence")).DataAsync())[0];
+        Assert.Equal(25000, v1Reloaded.GetProperty("vehiclePages")[0].GetProperty("subtotal").GetDecimal());
+        Assert.Equal(30000, v2Evidence.GetProperty("vehiclePages")[0].GetProperty("subtotal").GetDecimal());
     }
 
     [Fact]

@@ -1,14 +1,18 @@
 using System.Data;
+using System.Security.Claims;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using VMS.Modules.Trips.Data;
 using VMS.Modules.Trips.Domain;
 using VMS.Modules.Trips.Models;
+using VMS.Shared.Auditing;
+using VMS.Shared.Authorization;
 using VMS.Shared.Common;
 using VMS.Shared.Exceptions;
 using VMS.Shared.Messages;
 using VMS.Shared.Numbering;
+using VMS.Shared.Pagination;
 using VMS.Shared.Partners;
 using VMS.Shared.Time;
 using VMS.Shared.Vehicles;
@@ -21,6 +25,7 @@ public interface IInvoiceCreationService
 {
     Task<InvoiceModel> CreateAsync(CreateInvoiceRequest request, int createdByUserId, CancellationToken ct = default);
     Task<InvoiceModel> GetAsync(long invoiceId, CancellationToken ct = default);
+    Task<InvoiceAuditHistory> HistoryAsync(long invoiceId, int page, int pageSize, ClaimsPrincipal user, CancellationToken ct = default);
 }
 
 internal sealed class InvoiceCreationService(
@@ -298,6 +303,35 @@ internal sealed class InvoiceCreationService(
         return model;
     }
 
+    /// <summary>§48.1's own History tab — mirrors <c>CustomerService.HistoryAsync</c>/<c>TripService.HistoryAsync</c>
+    /// exactly. Every child table this module roots back to "Invoice" (adjustments, tax lines, documents,
+    /// evidence, settlements, receipts, payment transfers) shows up here too, not only header edits.</summary>
+    public async Task<InvoiceAuditHistory> HistoryAsync(long invoiceId, int page, int pageSize, ClaimsPrincipal user, CancellationToken ct = default)
+    {
+        var exists = await db.Invoices.AsNoTracking().AnyAsync(i => i.TenantId == tenant.TenantId && i.InvoiceId == invoiceId, ct);
+        if (!exists) throw new NotFoundException($"Invoice {invoiceId} was not found.");
+        page = page <= 0 ? 1 : page;
+        pageSize = pageSize <= 0 ? 50 : Math.Min(pageSize, 100);
+        var root = invoiceId.ToString();
+
+        var changes = db.Set<AuditEntry>().AsNoTracking().Where(a => a.TenantId == tenant.TenantId && a.RootEntity == "Invoice" && a.RootRecordId == root);
+        var total = await changes.CountAsync(ct);
+        var rows = await changes.OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.AuditEntryID)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+
+        var items = rows.Select(a =>
+        {
+            var hidden = a.RequiredPermission is { } permission && !user.HasPermission(permission);
+            return new InvoiceAuditHistoryChange
+            {
+                Id = a.AuditEntryID, OccurredAt = a.OccurredAt, GroupId = a.GroupId, UserName = a.UserName, Entity = a.Entity, RecordId = a.RecordId,
+                Action = a.Action, Field = a.Field, Reason = a.Reason, Restricted = hidden, OldValue = hidden ? null : a.OldValue, NewValue = hidden ? null : a.NewValue
+            };
+        }).ToList();
+
+        return new InvoiceAuditHistory { Changes = new PaginatedResponse<InvoiceAuditHistoryChange> { Items = items, TotalCount = total, Page = page, PageSize = pageSize } };
+    }
+
     /// <summary>§52 step 3: <c>sp_getapplock('INV-CUST-{CustomerId}', Exclusive)</c>. <c>@LockOwner = 'Transaction'</c>
     /// releases it automatically on commit or rollback — no explicit release call needed.</summary>
     private async Task AcquireCustomerLockAsync(int customerId, CancellationToken ct)
@@ -332,6 +366,8 @@ internal sealed class InvoiceCreationService(
         InvoiceId = i.InvoiceId, InvoiceNumber = i.InvoiceNumber, Version = i.Version, CustomerId = i.CustomerId, CustomerCode = i.CustomerCode,
         CustomerName = i.CustomerName, CurrencyCode = i.CurrencyCode, PeriodFrom = i.PeriodFrom, PeriodTo = i.PeriodTo, InvoiceDate = i.InvoiceDate, DueDate = i.DueDate,
         CustomerInvoiceTemplateId = i.CustomerInvoiceTemplateId, TemplateVersion = i.TemplateVersion, CustomerBillingAddressId = i.CustomerBillingAddressId,
+        BillToAddressName = i.BillToAddressName, BillToAddressLine1 = i.BillToAddressLine1, BillToAddressLine2 = i.BillToAddressLine2, BillToCityId = i.BillToCityId,
+        BillToProvinceState = i.BillToProvinceState, BillToCountryId = i.BillToCountryId, BillToPostalCode = i.BillToPostalCode, BillToNtn = i.BillToNtn, BillToStrn = i.BillToStrn,
         TotalTripAmount = i.TotalTripAmount, TotalAdjustment = i.TotalAdjustment, GrossAmount = i.GrossAmount, TotalDeduction = i.TotalDeduction,
         NetAmount = i.NetAmount, PaidAmount = i.PaidAmount, AdvanceAppliedAmount = i.AdvanceAppliedAmount, WriteOffAmount = i.WriteOffAmount,
         DiscountAmount = i.DiscountAmount, TransferredInAmount = i.TransferredInAmount, TransferredOutAmount = i.TransferredOutAmount,

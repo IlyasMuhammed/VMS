@@ -6,6 +6,7 @@ using VMS.Shared.Common;
 using VMS.Shared.Exceptions;
 using VMS.Shared.Messages;
 using VMS.Shared.Numbering;
+using VMS.Shared.Pagination;
 
 namespace VMS.Modules.Trips.Services;
 
@@ -15,6 +16,9 @@ namespace VMS.Modules.Trips.Services;
 public interface IPaymentReceiptService
 {
     Task<CustomerReceiptModel> CreateAsync(CreatePaymentReceiptRequest request, int userId, CancellationToken ct = default);
+    Task<CustomerReceiptModel> GetAsync(long customerReceiptId, CancellationToken ct = default);
+    /// <summary>Receipts List (§48.5) — see <see cref="ReceiptListItem"/>'s own doc comment for why this exists.</summary>
+    Task<PaginatedResponse<ReceiptListItem>> SearchAsync(ReceiptSearchFilter filter, int page, int pageSize, CancellationToken ct = default);
 }
 
 internal sealed class PaymentReceiptService(
@@ -170,5 +174,64 @@ internal sealed class PaymentReceiptService(
                 Allocations = allocationModels, Settlement = settlementModel
             };
         }, ct);
+    }
+
+    public async Task<CustomerReceiptModel> GetAsync(long customerReceiptId, CancellationToken ct = default)
+    {
+        var receipt = await db.CustomerReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.TenantId == tenant.TenantId && r.CustomerReceiptId == customerReceiptId, ct)
+            ?? throw new NotFoundException($"Receipt {customerReceiptId} was not found.");
+        var payments = await db.InvoicePayments.AsNoTracking().Where(p => p.TenantId == tenant.TenantId && p.CustomerReceiptId == customerReceiptId).ToListAsync(ct);
+        var invoiceIds = payments.Select(p => p.InvoiceId).Distinct().ToList();
+        var invoices = invoiceIds.Count == 0 ? new Dictionary<long, Invoice>() : await db.Invoices.AsNoTracking().Where(i => i.TenantId == tenant.TenantId && invoiceIds.Contains(i.InvoiceId)).ToDictionaryAsync(i => i.InvoiceId, ct);
+
+        return new CustomerReceiptModel
+        {
+            CustomerReceiptId = receipt.CustomerReceiptId, ReceiptNumber = receipt.ReceiptNumber, CustomerId = receipt.CustomerId, ReceiptDate = receipt.ReceiptDate,
+            ReceiptAmount = receipt.ReceiptAmount, CurrencyCode = receipt.CurrencyCode, PaymentMethod = receipt.PaymentMethod, BankCashAccountId = receipt.BankCashAccountId,
+            InstrumentNo = receipt.InstrumentNo, Status = receipt.Status, Remarks = receipt.Remarks, RowVersion = Convert.ToBase64String(receipt.RowVersion),
+            Allocations = payments.Select(p => new InvoicePaymentAllocationModel
+            {
+                InvoicePaymentId = p.InvoicePaymentId, InvoiceId = p.InvoiceId, InvoiceNumber = invoices.GetValueOrDefault(p.InvoiceId)?.InvoiceNumber ?? $"#{p.InvoiceId}",
+                Amount = p.Amount, LedgerEntryId = p.LedgerEntryId, InvoiceBalance = invoices.GetValueOrDefault(p.InvoiceId)?.BalanceAmount ?? 0,
+                InvoicePaymentStatus = invoices.GetValueOrDefault(p.InvoiceId)?.PaymentStatus ?? string.Empty,
+            }).ToList(),
+        };
+    }
+
+    public async Task<PaginatedResponse<ReceiptListItem>> SearchAsync(ReceiptSearchFilter filter, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = db.CustomerReceipts.AsNoTracking().Where(r => r.TenantId == tenant.TenantId);
+        if (filter.CustomerId is { } customerId) query = query.Where(r => r.CustomerId == customerId);
+        if (!string.IsNullOrWhiteSpace(filter.PaymentMethod)) query = query.Where(r => r.PaymentMethod == filter.PaymentMethod);
+        if (filter.BankCashAccountId is { } accountId) query = query.Where(r => r.BankCashAccountId == accountId);
+        if (!string.IsNullOrWhiteSpace(filter.Status)) query = query.Where(r => r.Status == filter.Status);
+        if (filter.FromDate is { } from) query = query.Where(r => r.ReceiptDate >= from);
+        if (filter.ToDate is { } to) query = query.Where(r => r.ReceiptDate <= to);
+
+        var total = await query.CountAsync(ct);
+        page = page <= 0 ? 1 : page;
+        pageSize = pageSize <= 0 ? 25 : Math.Min(pageSize, 200);
+        var rows = await query.OrderByDescending(r => r.ReceiptDate).ThenByDescending(r => r.CustomerReceiptId)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+
+        if (rows.Count == 0) return new PaginatedResponse<ReceiptListItem> { Items = [], TotalCount = total, Page = page, PageSize = pageSize };
+
+        var customerIds = rows.Select(r => r.CustomerId).Distinct().ToList();
+        var customers = await db.Customers.AsNoTracking().Where(c => c.TenantId == tenant.TenantId && customerIds.Contains(c.CustomerId)).ToDictionaryAsync(c => c.CustomerId, c => c.CustomerName, ct);
+
+        var receiptIds = rows.Select(r => r.CustomerReceiptId).ToList();
+        var invoiceNumbersByReceipt = await db.InvoicePayments.AsNoTracking().Where(p => p.TenantId == tenant.TenantId && receiptIds.Contains(p.CustomerReceiptId))
+            .Join(db.Invoices, p => p.InvoiceId, i => i.InvoiceId, (p, i) => new { p.CustomerReceiptId, i.InvoiceNumber })
+            .ToListAsync(ct);
+        var byReceipt = invoiceNumbersByReceipt.GroupBy(x => x.CustomerReceiptId).ToDictionary(g => g.Key, g => g.Select(x => x.InvoiceNumber).ToList());
+
+        var items = rows.Select(r => new ReceiptListItem
+        {
+            CustomerReceiptId = r.CustomerReceiptId, ReceiptNumber = r.ReceiptNumber, CustomerId = r.CustomerId, CustomerName = customers.GetValueOrDefault(r.CustomerId, $"#{r.CustomerId}"),
+            ReceiptDate = r.ReceiptDate, ReceiptAmount = r.ReceiptAmount, CurrencyCode = r.CurrencyCode, PaymentMethod = r.PaymentMethod, BankCashAccountId = r.BankCashAccountId,
+            InstrumentNo = r.InstrumentNo, Status = r.Status, InvoiceNumbers = byReceipt.GetValueOrDefault(r.CustomerReceiptId, []),
+        }).ToList();
+
+        return new PaginatedResponse<ReceiptListItem> { Items = items, TotalCount = total, Page = page, PageSize = pageSize };
     }
 }

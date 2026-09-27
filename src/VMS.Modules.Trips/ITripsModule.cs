@@ -48,6 +48,8 @@ public static class TripsModuleExtensions
         services.AddScoped<ITripDocumentService, TripDocumentService>();
         services.AddScoped<ITripPODService, TripPODService>();
         services.AddScoped<ITripIssueService, TripIssueService>();
+        services.AddScoped<ITripReviewService, TripReviewService>();
+        services.AddScoped<IDriverTripService, DriverTripService>();
         services.AddScoped<ITripRepricingService, TripRepricingService>();
         services.AddScoped<ICustomerActivationRequirement, RequiresActiveContactRequirement>();
         services.AddScoped<ICustomerActivationRequirement, RequiresDefaultBillingAddressRequirement>();
@@ -62,6 +64,7 @@ public static class TripsModuleExtensions
         services.AddScoped<IInvoiceEligibilityService, InvoiceEligibilityService>();
         services.AddScoped<IInvoiceNumberAllocator, InvoiceNumberAllocator>();
         services.AddScoped<IInvoiceCreationService, InvoiceCreationService>();
+        services.AddScoped<IInvoiceSearchService, InvoiceSearchService>();
         services.AddScoped<ILedgerNumberAllocator, LedgerNumberAllocator>();
         services.AddScoped<ICustomerLedgerSequenceAllocator, CustomerLedgerSequenceAllocator>();
         services.AddScoped<ICustomerLedgerPostingService, CustomerLedgerPostingService>();

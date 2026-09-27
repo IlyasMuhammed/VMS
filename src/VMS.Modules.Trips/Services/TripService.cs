@@ -21,6 +21,16 @@ public interface ITripService
     Task<TripModel> CreateFixedTripAsync(CreateFixedTripRequest request, TripCaller caller, CancellationToken ct = default);
     Task<TripModel> CreateOpenTripAsync(CreateOpenTripRequest request, TripCaller caller, CancellationToken ct = default);
     Task<TripHistory> HistoryAsync(long tripId, int page, int pageSize, ClaimsPrincipal user, CancellationToken ct = default);
+
+    // ── Create Trip in the app (§43, CC-45) ─────────────────────────────────────────
+    /// <summary>§43 step 5: "Submit → trip created as Draft, Source = DriverApp, rate resolved in the
+    /// background (hidden from driver)." The vehicle is always the driver's own default vehicle — never taken
+    /// from the request — and there is no override path at all (a driver overriding their own assignment makes
+    /// no sense).</summary>
+    Task<TripModel> CreateDriverFixedTripAsync(CreateDriverFixedTripRequest request, int driverId, int userId, CancellationToken ct = default);
+    /// <summary>§43 step 5: "Submit → Draft without amount; Operations enters the trip amount when reviewing" —
+    /// the mirror image of the office's own <see cref="CreateOpenTripAsync"/>, which requires one.</summary>
+    Task<TripModel> CreateDriverOpenTripAsync(CreateDriverOpenTripRequest request, int driverId, int userId, CancellationToken ct = default);
 }
 
 internal sealed class TripService(
@@ -164,6 +174,133 @@ internal sealed class TripService(
     /// this module has built for a trip (events, stops, fuel, expenses, income, documents, POD, issues, rate
     /// history) roots its own audit rows back to "Trip" (see each one's <c>GetAuditRoot()</c>), so one query here
     /// already shows the whole trip's story, not just changes to the <see cref="Trip"/> row itself.</summary>
+    public async Task<TripModel> CreateDriverFixedTripAsync(CreateDriverFixedTripRequest request, int driverId, int userId, CancellationToken ct = default)
+    {
+        var errors = new List<ValidationError>();
+        void Add(string field, string code, params (string Name, object? Value)[] values) => errors.Add(messages.Error(field, code, values));
+
+        await RequireActiveCustomerAsync(request.CustomerId, Add, ct);
+        var vehicleId = await OwnVehicleIdAsync(driverId, ct);
+
+        var config = await db.TripConfigurations.AsNoTracking().FirstOrDefaultAsync(c => c.TenantId == tenant.TenantId && c.TripConfigurationId == request.TripConfigurationId, ct);
+        if (config is null) Add("tripConfigurationId", Msg.Invalid, ("Field", "Trip configuration"));
+        else
+        {
+            if (config.CustomerId != request.CustomerId) Add("tripConfigurationId", Msg.Invalid, ("Field", "Trip configuration (belongs to a different customer)"));
+            if (config.Status != TripConfigurationStatuses.Active) Add("tripConfigurationId", Msg.Invalid, ("Field", "Trip configuration (not Active)"));
+        }
+        if (errors.Count > 0) throw new ValidationException(errors);
+
+        var allowed = await db.TripConfigurationVehicles.AnyAsync(v => v.TenantId == tenant.TenantId && v.TripConfigurationId == request.TripConfigurationId
+            && v.VehicleId == vehicleId && v.Status == ActiveInactiveStatuses.Active
+            && v.EffectiveFrom <= request.TripDate && (v.EffectiveTo == null || v.EffectiveTo >= request.TripDate), ct);
+        if (!allowed) Add("tripConfigurationId", Msg.Invalid, ("Field", "Trip configuration (your vehicle is not allowed on it for this date)"));
+
+        var (reference, warnings) = await ValidateReferenceAsync(request.CustomerId, request.CustomerTripReference, Add, ct);
+        if (errors.Count > 0) throw new ValidationException(errors);
+
+        var resolution = await rates.ResolveAsync(request.CustomerId, request.TripConfigurationId, request.TripDate, ct);
+
+        var trip = new Trip
+        {
+            TripType = TripTypes.Fixed, CustomerId = request.CustomerId, CustomerTripReference = reference,
+            TripConfigurationId = request.TripConfigurationId, RouteId = config!.RouteId, VehicleId = vehicleId,
+            DriverId = driverId, DefaultDriverId = driverId, IsDriverOverridden = false,
+            TripDate = request.TripDate, Status = TripStatuses.Draft, IsActive = true, Source = TripEventSources.DriverApp,
+        };
+        if (resolution.Found)
+        {
+            trip.TripRateId = resolution.TripRateId; trip.TripRateAmount = resolution.RateAmount; trip.RateEffectiveFrom = resolution.EffectiveFrom;
+            trip.RateEffectiveTo = resolution.EffectiveTo; trip.RateSource = TripRateSources.Configured; trip.TripAmount = resolution.RateAmount;
+            trip.CurrencyCode = resolution.CurrencyCode; trip.RateMissing = false;
+        }
+        else { trip.RateSource = TripRateSources.Missing; trip.RateMissing = true; }
+
+        await db.InTransactionAsync(async ct2 =>
+        {
+            trip.TripNumber = await numbers.NextAsync(ct2);
+            db.Trips.Add(trip);
+            await db.SaveChangesAsync(ct2);
+            events.Record(trip.TripId, TripEventTypes.Created, TripEventSources.DriverApp, userId);
+            await db.SaveChangesAsync(ct2);
+        }, ct);
+
+        var model = await ToModelAsync(trip, [], ct);
+        model.Warnings = warnings;
+        return model;
+    }
+
+    public async Task<TripModel> CreateDriverOpenTripAsync(CreateDriverOpenTripRequest request, int driverId, int userId, CancellationToken ct = default)
+    {
+        var errors = new List<ValidationError>();
+        void Add(string field, string code, params (string Name, object? Value)[] values) => errors.Add(messages.Error(field, code, values));
+
+        await RequireActiveCustomerAsync(request.CustomerId, Add, ct);
+        await ValidateLocationAsync("from", request.From, Add, ct);
+        await ValidateLocationAsync("to", request.To, Add, ct);
+        for (var i = 0; i < request.Stops.Count; i++) await ValidateLocationAsync($"stops[{i}]", request.Stops[i], Add, ct);
+        if (!request.IsRoundTrip && LocationsMatch(request.From, request.To)) Add("to", Msg.Invalid, ("Field", "From and To must differ unless the trip is a round trip"));
+
+        var vehicleId = await OwnVehicleIdAsync(driverId, ct);
+        var vehicle = await vehicles.FindAsync(vehicleId, ct);
+        if (vehicle is not null && !vehicle.IsOperational)
+            throw new BusinessRuleException("VEHICLE_NOT_OPERATIONAL", $"{vehicle.RegistrationNo} is not operational.",
+                [new BusinessRuleDetail("vehicleId", vehicleId, "Any operational vehicle may be used on an open trip (§22).")]);
+
+        var (reference, warnings) = await ValidateReferenceAsync(request.CustomerId, request.CustomerTripReference, Add, ct);
+        if (errors.Count > 0) throw new ValidationException(errors);
+
+        var trip = new Trip
+        {
+            TripType = TripTypes.Open, CustomerId = request.CustomerId, CustomerTripReference = reference, VehicleId = vehicleId,
+            DriverId = driverId, DefaultDriverId = driverId, IsDriverOverridden = false,
+            TripDate = request.TripDate, Status = TripStatuses.Draft, IsActive = true, Source = TripEventSources.DriverApp,
+            // §43: "Draft without amount; Operations enters the trip amount when reviewing" — the mirror image
+            // of the office flow's own required TripAmount.
+            RateSource = TripRateSources.Missing, TripAmount = null, RateMissing = true, IsRoundTrip = request.IsRoundTrip,
+            FromLocationType = request.From.LocationType, FromCityId = request.From.CityId, FromOtherLocationType = request.From.OtherLocationType,
+            FromOtherLocationName = Trim(request.From.OtherLocationName), FromOtherNearestCityId = request.From.OtherNearestCityId,
+            ToLocationType = request.To.LocationType, ToCityId = request.To.CityId, ToOtherLocationType = request.To.OtherLocationType,
+            ToOtherLocationName = Trim(request.To.OtherLocationName), ToOtherNearestCityId = request.To.OtherNearestCityId,
+        };
+
+        var stopRows = request.Stops.Select((s, i) => new TripStop
+        {
+            Sequence = i + 1, LocationType = s.LocationType, CityId = s.CityId, OtherLocationType = s.OtherLocationType,
+            OtherLocationName = Trim(s.OtherLocationName), OtherNearestCityId = s.OtherNearestCityId
+        }).ToList();
+
+        await db.InTransactionAsync(async ct2 =>
+        {
+            trip.TripNumber = await numbers.NextAsync(ct2);
+            db.Trips.Add(trip);
+            await db.SaveChangesAsync(ct2);
+            events.Record(trip.TripId, TripEventTypes.Created, TripEventSources.DriverApp, userId);
+            foreach (var stop in stopRows) stop.TripId = trip.TripId;
+            db.TripStops.AddRange(stopRows);
+            await db.SaveChangesAsync(ct2);
+        }, ct);
+
+        var model = await ToModelAsync(trip, stopRows, ct);
+        model.Warnings = warnings;
+        return model;
+    }
+
+    /// <summary>§43: "Vehicle pre-filled with the driver's assigned vehicle" — the same reverse lookup
+    /// <c>VehicleQueryService</c>'s own <c>OwnVehicles</c> scope already uses (<c>DefaultDriverId</c>), read
+    /// through the shared <see cref="IVehicleDirectory.AllAsync"/> full scan (Phase 1's own under-2,000-vehicles
+    /// NFR budget already accepted for that method) rather than a fourth extension to that interface for one
+    /// narrow, single-caller need.</summary>
+    private async Task<int> OwnVehicleIdAsync(int driverId, CancellationToken ct)
+    {
+        var all = await vehicles.AllAsync(ct);
+        var mine = all.Where(v => v.DefaultDriverId == driverId).OrderBy(v => v.Id).ToList();
+        if (mine.Count == 0)
+            throw new BusinessRuleException("NO_ASSIGNED_VEHICLE", "You are not the default driver of any vehicle.",
+                [new BusinessRuleDetail("driverId", driverId, "A trip can only be created in the app against the driver's own assigned vehicle.")]);
+        return mine[0].Id;
+    }
+
     public async Task<TripHistory> HistoryAsync(long tripId, int page, int pageSize, ClaimsPrincipal user, CancellationToken ct = default)
     {
         var exists = await db.Trips.AsNoTracking().AnyAsync(t => t.TenantId == tenant.TenantId && t.TripId == tripId, ct);

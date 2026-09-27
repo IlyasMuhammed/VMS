@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Trips.Data;
 using VMS.Modules.Trips.Domain;
@@ -18,6 +19,9 @@ public interface ITripExpenseService
     Task<TripExpenseModel> CreateAsync(long tripId, CreateTripExpenseRequest request, TripCaller caller, CancellationToken ct = default);
     Task<TripExpenseModel> DecideAsync(long tripExpenseId, DecideTripExpenseRequest request, int decidedByUserId, CancellationToken ct = default);
     Task<TripExpenseModel> VoidAsync(long tripExpenseId, VoidTripExpenseRequest request, int voidedByUserId, CancellationToken ct = default);
+    /// <summary>Not one of §47.2's own literal endpoints — added for the driver-sync facade (CC-45) to reload a
+    /// single entry by id (e.g. after a replayed <see cref="CreateTripExpenseRequest.ClientEventId"/>).</summary>
+    Task<TripExpenseModel> GetAsync(long tripExpenseId, CancellationToken ct = default);
 }
 
 internal sealed class TripExpenseService(TripsDbContext db, ITenantContext tenant, ICallerScope scope, IMessageCatalogue messages, ILookupReader lookups, IPartnerDirectory partners)
@@ -35,6 +39,14 @@ internal sealed class TripExpenseService(TripsDbContext db, ITenantContext tenan
     {
         var trip = await FindTripAsync(tripId, ct);
         TripAccess.Require(trip, caller, scope, PermissionCodes.TRP_EXPENSE_EDIT, "Expense.Edit", "Logging a trip expense");
+
+        // AC-54: a retried offline sync with the same ClientEventId is answered with the original entry.
+        if (request.ClientEventId is { } clientId)
+        {
+            var existing = await db.TripExpenses.AsNoTracking()
+                .FirstOrDefaultAsync(e => e.TenantId == tenant.TenantId && e.TripId == tripId && e.ClientEventId == clientId, ct);
+            if (existing is not null) return ToModel(existing);
+        }
 
         var errors = new List<ValidationError>();
         void Add(string field, string code, params (string Name, object? Value)[] values) => errors.Add(messages.Error(field, code, values));
@@ -64,7 +76,7 @@ internal sealed class TripExpenseService(TripsDbContext db, ITenantContext tenan
             OtherExpenseType = type!.Code == "OTHER" ? Trim(request.OtherExpenseType) : null, Description = Trim(request.Description),
             Quantity = request.Quantity, Rate = request.Rate, Amount = amount!.Value, Reference = Trim(request.Reference),
             BusinessPartnerId = request.BusinessPartnerId, PaymentMethod = request.PaymentMethod, AttachmentId = request.AttachmentId,
-            Source = TripAccess.IsOwnDriver(trip, scope) ? TripEventSources.DriverApp : TripEventSources.Manual
+            Source = TripAccess.IsOwnDriver(trip, scope) ? TripEventSources.DriverApp : TripEventSources.Manual, ClientEventId = request.ClientEventId
         };
         // §29: "Driver-app expenses start Pending ... approved by Ops/Fleet" — a back-office entry is made by
         // someone who already holds the approving role, so it starts Approved rather than needing self-approval.
@@ -72,7 +84,14 @@ internal sealed class TripExpenseService(TripsDbContext db, ITenantContext tenan
         if (entry.ApprovalStatus == TripExpenseApprovalStatuses.Approved) { entry.DecidedBy = caller.UserId; entry.DecidedAtUtc = DateTime.UtcNow; }
 
         db.TripExpenses.Add(entry);
-        await db.SaveChangesAsync(ct);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 } && request.ClientEventId is not null)
+        {
+            db.Entry(entry).State = EntityState.Detached;
+            var winner = await db.TripExpenses.AsNoTracking()
+                .FirstAsync(e => e.TenantId == tenant.TenantId && e.TripId == tripId && e.ClientEventId == request.ClientEventId, ct);
+            return ToModel(winner);
+        }
         return ToModel(entry);
     }
 
@@ -105,6 +124,8 @@ internal sealed class TripExpenseService(TripsDbContext db, ITenantContext tenan
         return ToModel(entry);
     }
 
+    public async Task<TripExpenseModel> GetAsync(long tripExpenseId, CancellationToken ct = default) => ToModel(await Find(tripExpenseId, ct));
+
     private async Task<Trip> FindTripAsync(long tripId, CancellationToken ct) =>
         await db.Trips.AsNoTracking().FirstOrDefaultAsync(t => t.TenantId == tenant.TenantId && t.TripId == tripId, ct)
         ?? throw new NotFoundException($"Trip {tripId} was not found.");
@@ -120,6 +141,6 @@ internal sealed class TripExpenseService(TripsDbContext db, ITenantContext tenan
         TripExpenseId = e.TripExpenseId, TripId = e.TripId, ExpenseDate = e.ExpenseDate, ExpenseTypeId = e.ExpenseTypeId, OtherExpenseType = e.OtherExpenseType,
         Description = e.Description, Quantity = e.Quantity, Rate = e.Rate, Amount = e.Amount, Reference = e.Reference, BusinessPartnerId = e.BusinessPartnerId,
         PaymentMethod = e.PaymentMethod, AttachmentId = e.AttachmentId, ApprovalStatus = e.ApprovalStatus, RejectionReason = e.RejectionReason, DecidedBy = e.DecidedBy,
-        DecidedAtUtc = e.DecidedAtUtc, Source = e.Source, IsVoided = e.IsVoided, VoidReason = e.VoidReason, VoidedBy = e.VoidedBy, VoidedAtUtc = e.VoidedAtUtc
+        DecidedAtUtc = e.DecidedAtUtc, Source = e.Source, ClientEventId = e.ClientEventId, IsVoided = e.IsVoided, VoidReason = e.VoidReason, VoidedBy = e.VoidedBy, VoidedAtUtc = e.VoidedAtUtc
     };
 }

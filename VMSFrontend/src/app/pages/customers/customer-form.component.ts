@@ -25,9 +25,10 @@ import { CustomerBillingConfigurationTabComponent } from './customer-billing-con
 import { CustomerTaxRulesTabComponent } from './customer-tax-rules-tab.component';
 import { CustomerInvoiceTemplatesTabComponent } from './customer-invoice-templates-tab.component';
 import { CustomerHistoryTabComponent } from './customer-history-tab.component';
+import { CustomerLedgerTabComponent } from './customer-ledger-tab.component';
 import { statusMoves } from './customer-logic';
 
-type CustomerTab = 'general' | 'contacts' | 'addresses' | 'billing' | 'tax' | 'templates' | 'history';
+type CustomerTab = 'general' | 'contacts' | 'addresses' | 'billing' | 'tax' | 'templates' | 'ledger' | 'history';
 
 /**
  * The Customer screen, for a new customer and for a saved one (FSD §10, §48.2 screens 1-7): a header with the
@@ -36,11 +37,12 @@ type CustomerTab = 'general' | 'contacts' | 'addresses' | 'billing' | 'tax' | 't
  * exists (mirrors `PartnerFormComponent`, minus the duplicate watcher — §10's own note says a duplicate name is
  * a warning-free, non-blocking concern here, so there is nothing to watch for).
  *
- * Two tabs the FSD also lists for this screen are deliberately not here yet: Trip Configurations (belongs to
- * the Setup cluster, screens 8-11+17, not built in this pass) and the customer's Ledger/Finance statement
- * (§48.5, its own future screen). There is also no Documents tab: `DocumentOwnerType` has no `Customer` member
- * — this FSD's own evidence concept (§13, POD & evidence) is a Trip/Invoice affair, not the shared BP/Vehicle
- * document register, so there is nothing to attach here.
+ * One tab the FSD also lists for this screen is deliberately not here yet: Trip Configurations (belongs to the
+ * Setup cluster, screens 8-11+17, not built in this pass). There is also no Documents tab: `DocumentOwnerType`
+ * has no `Customer` member — this FSD's own evidence concept (§13, POD & evidence) is a Trip/Invoice affair,
+ * not the shared BP/Vehicle document register, so there is nothing to attach here. The Ledger tab (§40A.4,
+ * built in a later cluster than the rest of this screen) also carries the go-live opening-balance action — see
+ * its own doc comment.
  */
 @Component({
   selector: 'app-customer-form',
@@ -48,7 +50,7 @@ type CustomerTab = 'general' | 'contacts' | 'addresses' | 'billing' | 'tax' | 't
   imports: [
     RouterLink, ButtonModule, TabsModule, CustomerStatusComponent, CustomerStatusDialogComponent, CustomerGeneralTabComponent,
     CustomerContactsTabComponent, CustomerBillingAddressesTabComponent, CustomerBillingConfigurationTabComponent, CustomerTaxRulesTabComponent,
-    CustomerInvoiceTemplatesTabComponent, CustomerHistoryTabComponent,
+    CustomerInvoiceTemplatesTabComponent, CustomerLedgerTabComponent, CustomerHistoryTabComponent,
   ],
   template: `
     <div class="page">
@@ -98,6 +100,7 @@ type CustomerTab = 'general' | 'contacts' | 'addresses' | 'billing' | 'tax' | 't
               @if (!isNew()) { <p-tab value="billing">Billing configuration</p-tab> }
               @if (!isNew()) { <p-tab value="tax">Tax / deductions</p-tab> }
               @if (!isNew()) { <p-tab value="templates">Invoice templates</p-tab> }
+              @if (!isNew()) { <p-tab value="ledger">Ledger</p-tab> }
               @if (!isNew()) { <p-tab value="history">History</p-tab> }
             </p-tablist>
             <p-tabpanels>
@@ -107,6 +110,7 @@ type CustomerTab = 'general' | 'contacts' | 'addresses' | 'billing' | 'tax' | 't
               @if (!isNew()) { <p-tabpanel value="billing">@if (activeTab() === 'billing') { <app-customer-billing-configuration-tab [customerId]="customer()!.customerId" /> }</p-tabpanel> }
               @if (!isNew()) { <p-tabpanel value="tax">@if (activeTab() === 'tax') { <app-customer-tax-rules-tab [customerId]="customer()!.customerId" /> }</p-tabpanel> }
               @if (!isNew()) { <p-tabpanel value="templates">@if (activeTab() === 'templates') { <app-customer-invoice-templates-tab [customerId]="customer()!.customerId" /> }</p-tabpanel> }
+              @if (!isNew()) { <p-tabpanel value="ledger">@if (activeTab() === 'ledger') { <app-customer-ledger-tab [customerId]="customer()!.customerId" [balances]="balances()" (posted)="load()" /> }</p-tabpanel> }
               @if (!isNew()) { <p-tabpanel value="history">@if (activeTab() === 'history') { <app-customer-history-tab [customerId]="customer()!.customerId" [version]="customer()!.rowVersion" /> }</p-tabpanel> }
             </p-tabpanels>
           </p-tabs>
@@ -183,6 +187,9 @@ export class CustomerFormComponent implements HasUnsavedChanges {
   constructor() {
     this.form.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.tick.update((n) => n + 1));
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
+    // Customer Balances' own "Open statement" drill-down (§40A.4) lands here as `?tab=ledger`.
+    const requestedTab = this.route.snapshot.queryParamMap.get('tab');
+    if (requestedTab === 'ledger') this.activeTab.set('ledger');
   }
 
   hasUnsavedChanges(): boolean {

@@ -3,6 +3,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VMS.Modules.Core.Files;
 using VMS.Shared.Exceptions;
@@ -85,6 +86,35 @@ public sealed class FileStoreTests(ApiFactory factory)
         Assert.Equal(content.Length, stored.SizeBytes);
         Assert.True(File.Exists(PathOf(stored)));
         Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(PathOf(stored))!, "*.tmp"));
+    }
+
+    /// <summary>A checked-in Development setting can still resolve to somewhere per-machine, outside the source
+    /// tree a debugger's file-watcher covers — the very thing that was landing uploads inside the running
+    /// project's own folder and looked, to whoever was debugging, like the app "just stopped" on every upload.</summary>
+    [Fact]
+    public async Task An_environment_variable_token_in_root_path_is_expanded()
+    {
+        var expanded = Path.Combine(Path.GetTempPath(), "vms-envtoken-" + Guid.NewGuid().ToString("N")[..12]);
+        Environment.SetEnvironmentVariable("VMS_TEST_FILE_ROOT", expanded);
+        try
+        {
+            using var host = factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, config) =>
+                config.AddInMemoryCollection(new Dictionary<string, string?> { ["FileStorage:RootPath"] = "%VMS_TEST_FILE_ROOT%" })));
+            host.CreateClient();
+            using var scope = host.Services.CreateScope();
+            var store = scope.ServiceProvider.GetRequiredService<IFileStore>();
+
+            using var stream = new MemoryStream(Pdf());
+            var stored = await store.SaveAsync(new FileUpload(stream, "book.pdf", Vehicle, FileRules.Scans, Guid.NewGuid()));
+
+            var path = Path.Combine(expanded, stored.StorageKey.Replace('/', Path.DirectorySeparatorChar));
+            Assert.True(File.Exists(path));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("VMS_TEST_FILE_ROOT", null);
+            if (Directory.Exists(expanded)) Directory.Delete(expanded, recursive: true);
+        }
     }
 
     [Fact]
@@ -488,5 +518,45 @@ public sealed class FileStoreTests(ApiFactory factory)
     public void Development_needs_no_setup()
     {
         new FileStorageOptions().Validate(isDevelopment: true);   // no throw
+    }
+
+    [Fact]
+    public void The_provider_defaults_to_local()
+    {
+        Assert.Equal(FileStorageProviders.Local, new FileStorageOptions().Provider);
+    }
+
+    [Theory]
+    [InlineData("local")]   // case-insensitive
+    [InlineData("Local")]
+    public void A_local_provider_validates_in_either_case(string provider)
+    {
+        new FileStorageOptions { Provider = provider }.Validate(isDevelopment: true);   // no throw
+    }
+
+    [Fact]
+    public void An_unknown_provider_is_refused()
+    {
+        Assert.Throws<InvalidOperationException>(() => new FileStorageOptions { Provider = "Sftp" }.Validate(isDevelopment: true));
+    }
+
+    /// <summary>Blob is reserved for later (no account exists yet): choosing it fails loudly at startup —
+    /// never a silent fallback to disk, which would surprise whoever picked Blob expecting it to be used.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void The_blob_provider_is_refused_until_it_is_actually_wired_up(bool isDevelopment)
+    {
+        Assert.Throws<InvalidOperationException>(() => new FileStorageOptions { Provider = FileStorageProviders.Blob }.Validate(isDevelopment));
+    }
+
+    [Fact]
+    public async Task Choosing_the_blob_provider_stops_the_application_starting()
+    {
+        using var host = factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["FileStorage:Provider"] = FileStorageProviders.Blob })));
+
+        // Whatever request actually boots the host surfaces the startup failure Validate() raised.
+        await Assert.ThrowsAnyAsync<Exception>(() => Task.Run(() => host.CreateClient()));
     }
 }

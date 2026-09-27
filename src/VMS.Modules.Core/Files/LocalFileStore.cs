@@ -30,8 +30,14 @@ internal sealed partial class LocalFileStore(
     [GeneratedRegex(@"^(?<tenant>[0-9a-f]{32})/\d{4}/\d{2}/[A-Za-z0-9_-]{1,64}/[A-Za-z0-9_-]{1,64}/[0-9a-f]{32}$")]
     private static partial Regex KeyPattern();
 
+    // %LOCALAPPDATA%-style tokens are expanded so a checked-in Development setting can still point somewhere
+    // per-machine. Falling back to ContentRootPath/App_Data/files when nothing is configured is fine for a
+    // quick, zero-config start, but that folder sits inside the very project a debugger is watching — the
+    // moment a file lands there, Hot Reload/file-watch sees a change under the running project and restarts
+    // it, which looks exactly like the debug session "just stopping" on every single upload. Development sets
+    // its own RootPath (see appsettings.Development.json) precisely to stay out of that trap.
     private string Root => Path.GetFullPath(_options.RootPath is { Length: > 0 } configured
-        ? configured
+        ? Environment.ExpandEnvironmentVariables(configured)
         : Path.Combine(environment.ContentRootPath, "App_Data", "files"));
 
     public async Task<StoredFile> SaveAsync(FileUpload upload, CancellationToken cancellationToken = default)

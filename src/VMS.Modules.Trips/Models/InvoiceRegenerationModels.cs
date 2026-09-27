@@ -33,3 +33,21 @@ public sealed class InvoiceRegenerationModel
     public List<PaymentTransferModel> Transfers { get; set; } = [];
     public List<string> Warnings { get; set; } = [];
 }
+
+/// <summary>§48.5's own literal endpoint (`GET /api/invoices/{id}/versions | Version chain | Invoice.View`) —
+/// every invoice sharing the invoice being asked about's own <c>RootInvoiceId</c>, oldest first. A brand-new
+/// invoice that has never been regenerated is a chain of exactly one: itself.</summary>
+public sealed class InvoiceVersionModel
+{
+    public long InvoiceId { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public int Version { get; set; }
+    public DateOnly InvoiceDate { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public decimal NetAmount { get; set; }
+    public decimal BalanceAmount { get; set; }
+    /// <summary>Why THIS version replaced the one before it — null on the chain's own first entry.</summary>
+    public string? RegenerationReason { get; set; }
+    public DateTime? RegeneratedOn { get; set; }
+}

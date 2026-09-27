@@ -19,7 +19,8 @@ public sealed class InvoiceCreationTests(ApiFactory factory)
     {
         var vehicles = await VehicleWorld.CreateAsync(factory);
         var admin = vehicles.As("Combined Admin", 1,
-            [.. VehicleWorld.VehiclePermissions, .. PartnerWorld.Everything, .. TripsWorld.Everything, PermissionCodes.TRP_INVOICE_GENERATE, PermissionCodes.TRP_INVOICE_VIEW, PermissionCodes.TRP_INCOME_EDIT]);
+            [.. VehicleWorld.VehiclePermissions, .. PartnerWorld.Everything, .. TripsWorld.Everything,
+             PermissionCodes.TRP_INVOICE_GENERATE, PermissionCodes.TRP_INVOICE_VIEW, PermissionCodes.TRP_INVOICE_CANCEL, PermissionCodes.TRP_INCOME_EDIT]);
         return (vehicles, admin);
     }
 
@@ -69,6 +70,66 @@ public sealed class InvoiceCreationTests(ApiFactory factory)
         var atDelivery = await (await admin.PostAsJsonAsync($"/api/trips/{tripId}/status/AtDelivery", new { rowVersion = inTransit.GetProperty("rowVersion").GetString() })).DataAsync();
         var delivered = await (await admin.PostAsJsonAsync($"/api/trips/{tripId}/status/Delivered", new { rowVersion = atDelivery.GetProperty("rowVersion").GetString(), endOdometer = 900 })).DataAsync();
         return await (await admin.PostAsJsonAsync($"/api/trips/{tripId}/status/Completed", new { rowVersion = delivered.GetProperty("rowVersion").GetString() })).DataAsync();
+    }
+
+    [Fact]
+    public async Task AC_04_the_invoice_keeps_its_bill_to_snapshot_even_after_the_address_changes()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerId = await ReadyCustomerAsync(admin); // creates the default "Head Office" / "Mall Road" address.
+        var truck = VehicleWorld.Id(await vehicles.ActiveAsync());
+        var driverId = await vehicles.DriverAsync();
+        var configId = await ReadyConfigAsync(admin, vehicles, customerId, truck, 25000, "Snapshot Route");
+        var trip = await CompleteTripAsync(admin, customerId, configId, truck, driverId, "2026-07-10");
+
+        var invoice = await (await admin.PostAsJsonAsync("/api/invoices", new
+        { customerId, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { trip.GetProperty("tripId").GetInt64() } })).DataAsync();
+        var invoiceId = invoice.GetProperty("invoiceId").GetInt64();
+        Assert.Equal("Head Office", invoice.GetProperty("billToAddressName").GetString());
+        Assert.Equal("Mall Road", invoice.GetProperty("billToAddressLine1").GetString());
+
+        var address = (await (await admin.GetAsync($"/api/customers/{customerId}/billing-addresses")).DataAsync()).EnumerateArray().Single();
+        var cities = await (await admin.GetAsync("/api/lookups/CITY")).DataAsync();
+        var anotherCityId = cities.EnumerateArray().First().GetProperty("id").GetInt32();
+        (await admin.PutAsJsonAsync($"/api/customer-billing-addresses/{address.GetProperty("customerBillingAddressId").GetInt64()}",
+            new { addressName = "Gulberg III", addressLine1 = "Gulberg III", cityId = anotherCityId })).EnsureSuccessStatusCode();
+
+        var reloaded = await (await admin.GetAsync($"/api/invoices/{invoiceId}")).DataAsync();
+        Assert.Equal("Head Office", reloaded.GetProperty("billToAddressName").GetString());
+        Assert.Equal("Mall Road", reloaded.GetProperty("billToAddressLine1").GetString());
+    }
+
+    /// <summary>CC-26/Q1's own answered format: "INV-2026-01-0001" — a 4-digit sequence resetting every calendar
+    /// month, no per-customer prefix; shared tenant-wide, not per customer, which is exactly what this proves by
+    /// using two different customers.</summary>
+    [Fact]
+    public async Task CC_26_invoice_numbers_follow_INV_YYYY_MM_NNNN_and_run_sequentially_tenant_wide()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerA = await ReadyCustomerAsync(admin);
+        var customerB = await ReadyCustomerAsync(admin);
+        var truck = VehicleWorld.Id(await vehicles.ActiveAsync());
+        var driverId = await vehicles.DriverAsync();
+        var configA = await ReadyConfigAsync(admin, vehicles, customerA, truck, 25000, "Numbering Route A");
+        var configB = await ReadyConfigAsync(admin, vehicles, customerB, truck, 25000, "Numbering Route B");
+        var tripA = await CompleteTripAsync(admin, customerA, configA, truck, driverId, "2026-07-10");
+        var tripB = await CompleteTripAsync(admin, customerB, configB, truck, driverId, "2026-07-11");
+
+        var invoiceA = await (await admin.PostAsJsonAsync("/api/invoices",
+            new { customerId = customerA, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { tripA.GetProperty("tripId").GetInt64() } })).DataAsync();
+        var invoiceB = await (await admin.PostAsJsonAsync("/api/invoices",
+            new { customerId = customerB, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { tripB.GetProperty("tripId").GetInt64() } })).DataAsync();
+
+        var today = DateTime.UtcNow;
+        var prefix = $"INV-{today:yyyy}-{today:MM}-";
+        var numberA = invoiceA.GetProperty("invoiceNumber").GetString()!;
+        var numberB = invoiceB.GetProperty("invoiceNumber").GetString()!;
+        Assert.Matches(@"^INV-\d{4}-\d{2}-\d{4}$", numberA);
+        Assert.StartsWith(prefix, numberA);
+        Assert.StartsWith(prefix, numberB);
+        // Sequential within the same (tenant, year, month) regardless of customer — the exact number after the
+        // shared prefix increases by one.
+        Assert.Equal(int.Parse(numberA[prefix.Length..]) + 1, int.Parse(numberB[prefix.Length..]));
     }
 
     [Fact]
@@ -283,5 +344,83 @@ public sealed class InvoiceCreationTests(ApiFactory factory)
         var noPermission = vehicles.As("NoInvoice", 44, [.. VehicleWorld.VehiclePermissions, .. PartnerWorld.Everything, .. TripsWorld.Everything]);
         var response = await noPermission.PostAsJsonAsync("/api/invoices", new { customerId, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { 1L } });
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>CC-44's own Invoice List (§48.5) — the first test of the first list/search endpoint this module
+    /// has ever had for invoices, the same gap CC-43 closed for trips.</summary>
+    [Fact]
+    public async Task Search_filters_by_customer_and_status()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerId = await ReadyCustomerAsync(admin);
+        var truck = VehicleWorld.Id(await vehicles.ActiveAsync());
+        var driverId = await vehicles.DriverAsync();
+        var configId = await ReadyConfigAsync(admin, vehicles, customerId, truck, 25000, "Search Route");
+        var trip = await CompleteTripAsync(admin, customerId, configId, truck, driverId, "2026-07-10");
+        var created = await (await admin.PostAsJsonAsync("/api/invoices", new { customerId, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { trip.GetProperty("tripId").GetInt64() } })).DataAsync();
+
+        var otherCustomerId = await ReadyCustomerAsync(admin);
+
+        var page = await (await admin.GetAsync($"/api/invoices/search?customerId={customerId}")).DataAsync();
+        var items = page.GetProperty("items").EnumerateArray().ToList();
+        var row = Assert.Single(items);
+        Assert.Equal(created.GetProperty("invoiceId").GetInt64(), row.GetProperty("invoiceId").GetInt64());
+        Assert.Equal("Generated", row.GetProperty("status").GetString());
+        Assert.False(string.IsNullOrEmpty(row.GetProperty("customerName").GetString()));
+
+        var forOther = await (await admin.GetAsync($"/api/invoices/search?customerId={otherCustomerId}")).DataAsync();
+        Assert.Empty(forOther.GetProperty("items").EnumerateArray());
+
+        var wrongStatus = await (await admin.GetAsync($"/api/invoices/search?customerId={customerId}&status=Draft")).DataAsync();
+        Assert.Empty(wrongStatus.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task History_shows_the_invoice_s_own_creation()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerId = await ReadyCustomerAsync(admin);
+        var truck = VehicleWorld.Id(await vehicles.ActiveAsync());
+        var driverId = await vehicles.DriverAsync();
+        var configId = await ReadyConfigAsync(admin, vehicles, customerId, truck, 25000, "History Route");
+        var trip = await CompleteTripAsync(admin, customerId, configId, truck, driverId, "2026-07-10");
+        var created = await (await admin.PostAsJsonAsync("/api/invoices", new { customerId, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { trip.GetProperty("tripId").GetInt64() } })).DataAsync();
+
+        var history = await (await admin.GetAsync($"/api/invoices/{created.GetProperty("invoiceId").GetInt64()}/history")).DataAsync();
+        var rows = history.GetProperty("changes").GetProperty("items").EnumerateArray().ToList();
+        Assert.Contains(rows, r => r.GetProperty("action").GetString() == "Created");
+    }
+
+    /// <summary>AC-50: "any... action... audit row exists with user, time, old and new values and reason." User,
+    /// time and old/new values are proven generically here, through the same shared audit capture every other
+    /// History test in this register already reads (<c>AuditCapture.Build</c>). The reason itself is proven
+    /// through the invoice's own dedicated <c>CancelReason</c> column, not the generic history row — no service
+    /// in this module ever calls <c>IAuditContext.Note(...)</c> (the one thing that would attach a reason to a
+    /// generic audit row; it exists but has no caller yet), so today a reason is always readable from the
+    /// entity's own GET, never from its own History tab. Documented as a real, minor, closeable gap in
+    /// TASKS.md's own CC-46 report rather than silently asserting something the mechanism does not yet do.</summary>
+    [Fact]
+    public async Task AC_50_a_reasoned_action_leaves_an_audit_row_with_user_and_time_and_the_reason_on_the_entity()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerId = await ReadyCustomerAsync(admin);
+        var truck = VehicleWorld.Id(await vehicles.ActiveAsync());
+        var driverId = await vehicles.DriverAsync();
+        var configId = await ReadyConfigAsync(admin, vehicles, customerId, truck, 25000, "Audit Route");
+        var trip = await CompleteTripAsync(admin, customerId, configId, truck, driverId, "2026-07-10");
+        var invoice = await (await admin.PostAsJsonAsync("/api/invoices", new { customerId, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { trip.GetProperty("tripId").GetInt64() } })).DataAsync();
+        var invoiceId = invoice.GetProperty("invoiceId").GetInt64();
+
+        (await admin.PostAsJsonAsync($"/api/invoices/{invoiceId}/cancel", new { rowVersion = invoice.GetProperty("rowVersion").GetString(), reason = "Wrong period requested" })).EnsureSuccessStatusCode();
+
+        var history = await (await admin.GetAsync($"/api/invoices/{invoiceId}/history")).DataAsync();
+        var rows = history.GetProperty("changes").GetProperty("items").EnumerateArray().ToList();
+        var statusChange = Assert.Single(rows, r => r.GetProperty("field").GetString() == "Status" && r.GetProperty("newValue").GetString() == "Cancelled");
+        Assert.Equal("Generated", statusChange.GetProperty("oldValue").GetString());
+        Assert.False(string.IsNullOrEmpty(statusChange.GetProperty("userName").GetString()));
+        Assert.False(string.IsNullOrEmpty(statusChange.GetProperty("occurredAt").GetString()));
+
+        var reloaded = await (await admin.GetAsync($"/api/invoices/{invoiceId}")).DataAsync();
+        Assert.Equal("Wrong period requested", reloaded.GetProperty("cancelReason").GetString());
     }
 }

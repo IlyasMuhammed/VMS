@@ -18,6 +18,9 @@ namespace VMS.Modules.Trips.Services;
 public interface IInvoiceRegenerationService
 {
     Task<InvoiceRegenerationModel> RegenerateAsync(long invoiceId, RegenerateInvoiceRequest request, int userId, CancellationToken ct = default);
+
+    /// <summary>§48.5's own "Versions" tab: the whole regeneration chain this invoice belongs to, oldest first.</summary>
+    Task<IReadOnlyList<InvoiceVersionModel>> ChainAsync(long invoiceId, CancellationToken ct = default);
 }
 
 internal sealed class InvoiceRegenerationService(
@@ -111,5 +114,21 @@ internal sealed class InvoiceRegenerationService(
                 ReleasedTripNumbers = releasedTripNumbers, Transfers = posted.ToList(), Warnings = warnings
             };
         }, ct);
+    }
+
+    public async Task<IReadOnlyList<InvoiceVersionModel>> ChainAsync(long invoiceId, CancellationToken ct = default)
+    {
+        var invoice = await db.Invoices.AsNoTracking().FirstOrDefaultAsync(i => i.TenantId == tenant.TenantId && i.InvoiceId == invoiceId, ct)
+            ?? throw new NotFoundException($"Invoice {invoiceId} was not found.");
+        return await db.Invoices.AsNoTracking()
+            .Where(i => i.TenantId == tenant.TenantId && i.RootInvoiceId == invoice.RootInvoiceId)
+            .OrderBy(i => i.Version)
+            .Select(i => new InvoiceVersionModel
+            {
+                InvoiceId = i.InvoiceId, InvoiceNumber = i.InvoiceNumber, Version = i.Version, InvoiceDate = i.InvoiceDate,
+                Status = i.Status, IsActive = i.IsActive, NetAmount = i.NetAmount, BalanceAmount = i.BalanceAmount,
+                RegenerationReason = i.RegenerationReason, RegeneratedOn = i.RegeneratedOn,
+            })
+            .ToListAsync(ct);
     }
 }

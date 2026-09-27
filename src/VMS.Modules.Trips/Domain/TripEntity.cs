@@ -77,6 +77,12 @@ internal sealed class Trip : ITenantScopedEntity, IAuditRooted
     public string? InactiveReason { get; set; }
     public long? InvoiceId { get; set; }
     public string? Remarks { get; set; }
+    /// <summary>§43: "trip created as Draft, Source = DriverApp" — reuses the exact same <see cref="TripEventSources"/>
+    /// constants every child record (Event/Fuel/Expense/Document) already stamps itself with, rather than a new
+    /// enum for the identical concept one level up. Distinguishes a driver's own trip creation from an office one
+    /// for the Pending Review queue (CC-45) — every earlier task that ever creates a <see cref="Trip"/> row leaves
+    /// this at its default, <see cref="TripEventSources.Manual"/>.</summary>
+    public string Source { get; set; } = TripEventSources.Manual;
     public byte[] RowVersion { get; set; } = [];
 }
 

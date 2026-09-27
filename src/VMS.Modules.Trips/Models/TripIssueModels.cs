@@ -10,6 +10,7 @@ public sealed class TripIssueModel
     public long? PhotoDocumentId { get; set; }
     public int ReportedBy { get; set; }
     public DateTime ReportedAtUtc { get; set; }
+    public Guid? ClientEventId { get; set; }
     public bool IsResolved { get; set; }
     public int? ResolvedBy { get; set; }
     public DateTime? ResolvedAtUtc { get; set; }
@@ -26,6 +27,8 @@ public sealed class CreateTripIssueRequest
     /// particular <see cref="IssueType"/> (the FSD names no rule for which types always do). When true, this
     /// reuses <c>ITripLifecycleService.HoldAsync</c> directly rather than a second, parallel hold path.</summary>
     public bool PutOnHold { get; set; }
+    /// <summary>§43/AC-54: a retried offline sync with the same id is answered with the original entry.</summary>
+    public Guid? ClientEventId { get; set; }
 }
 
 public sealed class ResolveTripIssueRequest

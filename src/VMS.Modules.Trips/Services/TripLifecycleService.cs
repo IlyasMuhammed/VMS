@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Trips.Data;
 using VMS.Modules.Trips.Domain;
 using VMS.Modules.Trips.Models;
@@ -28,6 +29,14 @@ internal sealed class TripLifecycleService(
     public async Task<TripModel> TransitionAsync(long tripId, string toStatus, TransitionTripRequest request, TripCaller caller, CancellationToken ct = default)
     {
         var trip = await Find(tripId, ct);
+
+        // AC-54: a retried offline sync with the same ClientEventId is answered with the trip's own current
+        // state, not re-attempted (and, since the trip has by now already moved on, likely refused a second
+        // time) — the same TripEvent.ClientEventId column CreateTripEventRequest already established.
+        if (request.ClientEventId is { } clientId
+            && await db.TripEvents.AsNoTracking().AnyAsync(e => e.TenantId == tenant.TenantId && e.TripId == tripId && e.ClientEventId == clientId, ct))
+            return await trips.GetAsync(tripId, ct);
+
         if (!TripStatuses.All.Contains(toStatus)) throw new ValidationException(messages.Error("status", Msg.OneOf, ("Field", "Status"), ("Allowed", string.Join(", ", TripStatuses.All))));
 
         var isNormal = TripLifecycle.IsNormalTransition(trip.Status, toStatus);
@@ -86,10 +95,15 @@ internal sealed class TripLifecycleService(
 
         if (!isNormal) events.Record(tripId, TripEventTypes.StatusSkipped, TripEventSources.System, caller.UserId, remarks: $"Skipped from {fromStatus} to {toStatus}.");
         events.Record(tripId, TripEventTypes.ForStatus(toStatus), TripAccess.IsOwnDriver(trip, scope) ? TripEventSources.DriverApp : TripEventSources.Manual, caller.UserId,
-            odometer: request.StartOdometer ?? request.EndOdometer);
+            odometer: request.StartOdometer ?? request.EndOdometer, clientEventId: request.ClientEventId);
 
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { throw await StaleAsync(tripId, ct); }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 } && request.ClientEventId is not null)
+        {
+            // Another request with the same ClientEventId won the race — its own transition already stands.
+            return await trips.GetAsync(tripId, ct);
+        }
         return await trips.GetAsync(tripId, ct);
     }
 

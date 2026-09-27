@@ -140,6 +140,63 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/fuel-cards/fuel-cards.component').then((m) => m.FuelCardsComponent),
       },
       {
+        path: 'trips',
+        ...page('Trip Desk', { permission: 'TRP.TRIP.VIEW' }, { label: 'Trip Desk', icon: 'pi-send', section: 'Business', description: 'Every trip, fixed or open, and where it stands.' }),
+        loadComponent: () => import('./pages/trips/trip-desk.component').then((m) => m.TripDeskComponent),
+      },
+      {
+        path: 'trips/new-fixed',
+        ...page('New fixed trip', { permission: 'TRP.TRIP.CREATE' }),
+        loadComponent: () => import('./pages/trips/fixed-trip-form.component').then((m) => m.FixedTripFormComponent),
+      },
+      {
+        path: 'trips/new-open',
+        ...page('New open trip', { permission: 'TRP.TRIP.CREATE' }),
+        loadComponent: () => import('./pages/trips/open-trip-form.component').then((m) => m.OpenTripFormComponent),
+      },
+      {
+        path: 'trips/:id',
+        ...page('Trip', { permission: 'TRP.TRIP.VIEW' }),
+        loadComponent: () => import('./pages/trips/trip-detail.component').then((m) => m.TripDetailComponent),
+      },
+      {
+        path: 'invoices',
+        ...page('Invoices', { permission: 'TRP.INVOICE.VIEW' }, { label: 'Invoices', icon: 'pi-file-edit', section: 'Business', description: 'Every invoice generated, and where it stands.' }),
+        loadComponent: () => import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
+      },
+      {
+        // Before `invoices/:id`, so "generate" is not read as an id.
+        path: 'invoices/generate',
+        ...page('Generate invoice', { permission: 'TRP.INVOICE.GENERATE' }),
+        loadComponent: () => import('./pages/invoices/invoice-generation.component').then((m) => m.InvoiceGenerationComponent),
+      },
+      {
+        // Before `invoices/:id`, so "regenerate" on a specific invoice is not read as a second id segment.
+        path: 'invoices/:id/regenerate',
+        ...page('Regenerate invoice', { permission: 'TRP.INVOICE.REGENERATE' }),
+        loadComponent: () => import('./pages/invoices/invoice-regeneration.component').then((m) => m.InvoiceRegenerationComponent),
+      },
+      {
+        path: 'invoices/:id',
+        ...page('Invoice', { permission: 'TRP.INVOICE.VIEW' }),
+        loadComponent: () => import('./pages/invoices/invoice-detail.component').then((m) => m.InvoiceDetailComponent),
+      },
+      {
+        path: 'receipts',
+        ...page('Receipts', { permission: 'TRP.PAYMENT.CREATE' }, { label: 'Receipts', icon: 'pi-wallet', section: 'Business', description: 'Every payment received, and which invoices it was applied to.' }),
+        loadComponent: () => import('./pages/payments/receipts.component').then((m) => m.ReceiptsComponent),
+      },
+      {
+        path: 'advances',
+        ...page('Advances', { permission: 'TRP.PAYMENT.ADVANCE' }, { label: 'Advances', icon: 'pi-wallet', section: 'Business', description: 'Advances recorded against Open trips, and where each one stands.' }),
+        loadComponent: () => import('./pages/advances/advances.component').then((m) => m.AdvancesComponent),
+      },
+      {
+        path: 'customer-balances',
+        ...page('Customer Balances', { permission: 'TRP.LEDGER.VIEW' }, { label: 'Customer Balances', icon: 'pi-chart-line', section: 'Business', description: "What every customer owes, or is owed, right now." }),
+        loadComponent: () => import('./pages/ledger/customer-balances.component').then((m) => m.CustomerBalancesComponent),
+      },
+      {
         path: 'payables',
         ...page('Payables due', { permission: 'FIN.DUE.CONFIRM' }, { label: 'Payables due', icon: 'pi-wallet', section: 'Business', description: 'This month’s due items across the fleet, clearable in bulk.' }),
         loadComponent: () => import('./pages/payables/payables.component').then((m) => m.PayablesComponent),
@@ -179,6 +236,11 @@ export const routes: Routes = [
         path: 'admin/notification-rules',
         ...page('Notification rules', { permission: 'ADM.NOTIFICATION.MANAGE' }, { label: 'Notification rules', icon: 'pi-bell', section: 'Administration', description: 'Lead days and recipients behind every alert.' }),
         loadComponent: () => import('./pages/admin/notification-rules.component').then((m) => m.NotificationRulesComponent),
+      },
+      {
+        path: 'admin/currency-setup',
+        ...page('Currency Setup', { permission: 'TRP.CURRENCY.MANAGE' }, { label: 'Currency Setup', icon: 'pi-money-bill', section: 'Administration', description: 'The base currency, the currency master, and exchange rates against the base.' }),
+        loadComponent: () => import('./pages/admin/currency-setup.component').then((m) => m.CurrencySetupComponent),
       },
       {
         path: 'admin/ui-kit',

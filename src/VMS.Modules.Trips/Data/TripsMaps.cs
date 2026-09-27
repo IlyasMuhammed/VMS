@@ -316,6 +316,7 @@ internal sealed class TripMap : IEntityTypeConfiguration<Trip>
         b.Property(x => x.CurrencyCode).HasMaxLength(3).IsFixedLength();
         b.Property(x => x.Status).HasMaxLength(12).IsRequired();
         b.Property(x => x.Remarks).HasMaxLength(1000);
+        b.Property(x => x.Source).HasMaxLength(10).IsRequired();
         b.Property(x => x.RowVersion).IsRowVersion();
 
         b.Property(x => x.FromLocationType).HasMaxLength(10);
@@ -329,6 +330,10 @@ internal sealed class TripMap : IEntityTypeConfiguration<Trip>
         b.HasIndex(x => new { x.TenantId, x.CustomerId });
         b.HasIndex(x => new { x.TenantId, x.TripConfigurationId });
         b.HasIndex(x => new { x.TenantId, x.VehicleId });
+        // CC-45's own Pending Review queue: Draft trips the driver app created.
+        b.HasIndex(x => new { x.TenantId, x.Status, x.Source });
+        // CC-45's own "My Trips": a driver's own trips, from Assigned onward.
+        b.HasIndex(x => new { x.TenantId, x.DriverId, x.Status });
     }
 }
 
@@ -422,6 +427,8 @@ internal sealed class TripIssueMap : IEntityTypeConfiguration<TripIssue>
         b.Property(x => x.ResolutionNotes).HasMaxLength(1000);
 
         b.HasIndex(x => new { x.TenantId, x.TripId });
+        // AC-54: the same offline-dedup backstop TripEvent already has.
+        b.HasIndex(x => new { x.TripId, x.ClientEventId }).HasFilter("[ClientEventId] IS NOT NULL").IsUnique();
     }
 }
 
@@ -499,6 +506,8 @@ internal sealed class TripFuelMap : IEntityTypeConfiguration<TripFuel>
 
         b.HasIndex(x => new { x.TenantId, x.TripId });
         b.HasIndex(x => new { x.TenantId, x.VehicleId, x.FuelDateTime });
+        // AC-54: the same offline-dedup backstop TripEvent already has.
+        b.HasIndex(x => new { x.TripId, x.ClientEventId }).HasFilter("[ClientEventId] IS NOT NULL").IsUnique();
     }
 }
 
@@ -522,6 +531,8 @@ internal sealed class TripExpenseMap : IEntityTypeConfiguration<TripExpense>
 
         b.HasIndex(x => new { x.TenantId, x.TripId });
         b.HasIndex(x => new { x.TenantId, x.ApprovalStatus });
+        // AC-54: the same offline-dedup backstop TripEvent already has.
+        b.HasIndex(x => new { x.TripId, x.ClientEventId }).HasFilter("[ClientEventId] IS NOT NULL").IsUnique();
     }
 }
 
@@ -695,7 +706,8 @@ internal sealed class InvoiceNumberCounterMap : IEntityTypeConfiguration<Invoice
     {
         b.ToTable("InvoiceNumberCounters");
         b.HasKey(x => x.InvoiceNumberCounterId);
-        b.HasIndex(x => new { x.TenantId, x.Year }).IsUnique();
+        // CC-26/Q1: the sequence resets every calendar month, not every year.
+        b.HasIndex(x => new { x.TenantId, x.Year, x.Month }).IsUnique();
     }
 }
 

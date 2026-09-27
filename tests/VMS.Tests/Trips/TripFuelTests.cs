@@ -75,6 +75,25 @@ public sealed class TripFuelTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task AC_65_with_multi_currency_on_a_chosen_currency_is_kept_and_off_it_is_forced_to_base()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var trip = await StartedTripAsync(vehicles, admin);
+        var tripId = trip.GetProperty("tripId").GetInt64();
+
+        (await admin.PutAsJsonAsync("/api/tenant/currency-settings", new { baseCurrencyCode = "PKR", multiCurrencyEnabled = true })).EnsureSuccessStatusCode();
+        var chosen = await (await admin.PostAsJsonAsync($"/api/trips/{tripId}/fuel",
+            new { fuelType = "Diesel", quantity = 10, rate = 280, paymentMethod = "Cash", currencyCode = "usd" })).DataAsync();
+        Assert.Equal("USD", chosen.GetProperty("currencyCode").GetString());
+
+        // §13A/AC-64: switched back off, the very next entry is forced to the base regardless of what is asked for.
+        (await admin.PutAsJsonAsync("/api/tenant/currency-settings", new { baseCurrencyCode = "PKR", multiCurrencyEnabled = false })).EnsureSuccessStatusCode();
+        var forced = await (await admin.PostAsJsonAsync($"/api/trips/{tripId}/fuel",
+            new { fuelType = "Diesel", quantity = 5, rate = 280, paymentMethod = "Cash", currencyCode = "usd" })).DataAsync();
+        Assert.Equal("PKR", forced.GetProperty("currencyCode").GetString());
+    }
+
+    [Fact]
     public async Task AC_23_fuel_card_required_when_payment_method_is_fuel_card()
     {
         var (vehicles, admin) = await WorldAsync(factory);

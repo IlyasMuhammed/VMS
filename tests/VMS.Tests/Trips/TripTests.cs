@@ -102,7 +102,7 @@ public sealed class TripTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task A_vehicle_not_allowed_on_the_configuration_for_the_trip_date_is_refused()
+    public async Task AC_11_a_vehicle_not_allowed_on_the_configuration_for_the_trip_date_is_refused()
     {
         var (vehicles, admin) = await WorldAsync(factory);
         var (customerId, configId, _, driverId) = await ReadyConfigAsync(vehicles, admin);

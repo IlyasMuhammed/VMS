@@ -33,6 +33,9 @@ internal sealed class TripFuel : ITenantScopedEntity, IAuditRooted
     public string? Remarks { get; set; }
     public string CurrencyCode { get; set; } = string.Empty;
     public string Source { get; set; } = TripEventSources.Manual;
+    /// <summary>§43/AC-54: the same offline-dedup column <see cref="TripEvent.ClientEventId"/> already
+    /// established for the driver app — null for anything logged Manual, which has no client to retry it.</summary>
+    public Guid? ClientEventId { get; set; }
 
     public bool IsVoided { get; set; }
     public string? VoidReason { get; set; }

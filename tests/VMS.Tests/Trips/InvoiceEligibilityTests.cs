@@ -69,10 +69,13 @@ public sealed class InvoiceEligibilityTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task A_completed_trip_in_period_is_available_and_totalled()
+    public async Task AC_25_and_AC_57_a_completed_trip_in_period_is_available_and_priced_at_its_own_trip_date()
     {
         var (vehicles, admin) = await WorldAsync(factory);
-        var (customerId, trip) = await CompletedTripAsync(vehicles, admin, rateAmount: 25000);
+        // §25/AC-57: TripDate (2026-07-10) is fixed, well outside the search period below (centred on "today,"
+        // i.e. CompletionDate) — inclusion is decided by CompletionDate, pricing still snapshots TripDate's own
+        // rate (§32.1's own worked example: "trip dated 31-Aug completed 01-Sep... priced at the 31-Aug rate").
+        var (customerId, trip) = await CompletedTripAsync(vehicles, admin, rateAmount: 25000, tripDate: "2026-07-10");
 
         var response = await admin.PostAsJsonAsync("/api/invoices/search-eligible-trips",
             new { customerId, periodFrom = Day(-30), periodTo = Day(30) });
@@ -85,6 +88,7 @@ public sealed class InvoiceEligibilityTests(ApiFactory factory)
         var row = result.GetProperty("trips").EnumerateArray().First();
         Assert.Equal(trip.GetProperty("tripId").GetInt64(), row.GetProperty("tripId").GetInt64());
         Assert.Equal("Available", row.GetProperty("category").GetString());
+        Assert.Equal(25000, row.GetProperty("amount")!.GetDecimal());
         Assert.False(string.IsNullOrEmpty(row.GetProperty("route").GetString()));
     }
 

@@ -69,7 +69,7 @@ public sealed class TripConfigurationTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task Two_customers_on_the_same_route_get_independent_configurations()
+    public async Task AC_10_two_customers_on_the_same_route_get_independent_configurations()
     {
         var (_, admin) = await WorldAsync(factory);
         var (customerA, routeId) = await ActiveCustomerAndRouteAsync(admin);

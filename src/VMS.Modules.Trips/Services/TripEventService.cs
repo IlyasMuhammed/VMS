@@ -16,16 +16,16 @@ namespace VMS.Modules.Trips.Services;
 /// automatically" without a second, separate save.</summary>
 public interface ITripEventRecorder
 {
-    void Record(long tripId, string eventType, string source, int userId, string? remarks = null, decimal? odometer = null, long? attachmentId = null);
+    void Record(long tripId, string eventType, string source, int userId, string? remarks = null, decimal? odometer = null, long? attachmentId = null, Guid? clientEventId = null);
 }
 
 internal sealed class TripEventRecorder(TripsDbContext db) : ITripEventRecorder
 {
-    public void Record(long tripId, string eventType, string source, int userId, string? remarks = null, decimal? odometer = null, long? attachmentId = null) =>
+    public void Record(long tripId, string eventType, string source, int userId, string? remarks = null, decimal? odometer = null, long? attachmentId = null, Guid? clientEventId = null) =>
         db.TripEvents.Add(new TripEvent
         {
             TripId = tripId, EventType = eventType, EventDateTime = DateTime.UtcNow, Odometer = odometer,
-            UserId = userId, Remarks = remarks, AttachmentId = attachmentId, Source = source
+            UserId = userId, Remarks = remarks, AttachmentId = attachmentId, Source = source, ClientEventId = clientEventId
         });
 }
 

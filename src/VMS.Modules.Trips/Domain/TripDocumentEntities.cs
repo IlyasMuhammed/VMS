@@ -89,6 +89,9 @@ internal sealed class TripIssue : ITenantScopedEntity, IAuditRooted
     public long? PhotoDocumentId { get; set; }
     public int ReportedBy { get; set; }
     public DateTime ReportedAtUtc { get; set; }
+    /// <summary>§43/AC-54: the same offline-dedup column <see cref="TripEvent.ClientEventId"/> already
+    /// established for the driver app.</summary>
+    public Guid? ClientEventId { get; set; }
     public bool IsResolved { get; set; }
     public int? ResolvedBy { get; set; }
     public DateTime? ResolvedAtUtc { get; set; }

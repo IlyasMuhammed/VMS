@@ -119,15 +119,17 @@ internal sealed class ActivationService(
             Item("finance", "Bank finance agreement", found);
         }
 
-        // 4. The registration book (BR-VH-015): required for a vehicle we own or lease from a bank, a warning for one whose papers sit with its owner.
+        // 4. The registration book: a reminder, not a blocker, for every category — it can be uploaded any time
+        // after activation too. (Superseded BR-VH-015, which required it up front for a vehicle we own or lease
+        // from a bank; that made activation impossible until the paper copy was scanned in, which was the
+        // reported problem.)
         if (category.Length > 0)
         {
-            var needed = category is OwnershipCategories.SelfOwned or OwnershipCategories.BankLeased;
             var has = await documents.HasRegistrationBookAsync(vehicle.VehicleId);
             found = Errors();
             if (!has) found.Add(Error("documents", Msg.VhRegistrationBookRequired));
             var note = !documents.CanCheck ? "The documents module is not installed yet, so the registration book is not being checked." : null;
-            Item("registrationBook", "Registration book", found, blocking: needed, message: note);
+            Item("registrationBook", "Registration book", found, blocking: false, message: note);
         }
 
         // The postings and the schedule, when there is enough to work them out.

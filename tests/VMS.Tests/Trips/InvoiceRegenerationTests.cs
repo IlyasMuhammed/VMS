@@ -213,6 +213,40 @@ public sealed class InvoiceRegenerationTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Versions_lists_the_whole_chain_oldest_first_from_any_member()
+    {
+        var (vehicles, admin) = await WorldAsync(factory);
+        var customerId = await ReadyCustomerAsync(admin);
+        var truck = VehicleWorld.Id(await vehicles.ActiveAsync());
+        var driverId = await vehicles.DriverAsync();
+        var configId = await ReadyConfigAsync(admin, customerId, truck, 25000, "Versions Route");
+        var tripId = await CompleteTripAsync(admin, customerId, configId, truck, driverId, "2026-07-10");
+        var v1 = await (await admin.PostAsJsonAsync("/api/invoices", new { customerId, periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { tripId } })).DataAsync();
+        var v1Id = v1.GetProperty("invoiceId").GetInt64();
+
+        var v2Response = await admin.PostAsJsonAsync($"/api/invoices/{v1Id}/regenerate", new { periodFrom = Day(-30), periodTo = Day(30), tripIds = new[] { tripId }, regenerationReason = "First correction" });
+        Assert.True(v2Response.IsSuccessStatusCode, await v2Response.Content.ReadAsStringAsync());
+        var v2Id = (await v2Response.DataAsync()).GetProperty("invoice").GetProperty("invoiceId").GetInt64();
+
+        // Asked from the OLDEST member of the chain (v1, now Inactive) — still returns all of it, not just itself.
+        var fromOldest = await (await admin.GetAsync($"/api/invoices/{v1Id}/versions")).DataAsync();
+        var versions = fromOldest.EnumerateArray().ToList();
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(1, versions[0].GetProperty("version").GetInt32());
+        Assert.Equal(v1Id, versions[0].GetProperty("invoiceId").GetInt64());
+        Assert.Null(versions[0].GetProperty("regenerationReason").GetString());
+        Assert.Equal(2, versions[1].GetProperty("version").GetInt32());
+        Assert.Equal(v2Id, versions[1].GetProperty("invoiceId").GetInt64());
+        Assert.Equal("First correction", versions[1].GetProperty("regenerationReason").GetString());
+        Assert.True(versions[1].GetProperty("isActive").GetBoolean());
+        Assert.False(versions[0].GetProperty("isActive").GetBoolean());
+
+        // Asked from the NEWEST member — same chain, same order.
+        var fromNewest = await (await admin.GetAsync($"/api/invoices/{v2Id}/versions")).DataAsync();
+        Assert.Equal(2, fromNewest.EnumerateArray().Count());
+    }
+
+    [Fact]
     public async Task Regenerating_a_submitted_invoice_mirrors_its_ledger_entries()
     {
         var (vehicles, admin) = await WorldAsync(factory);

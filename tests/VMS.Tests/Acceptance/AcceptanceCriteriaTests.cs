@@ -306,9 +306,11 @@ public sealed class AcceptanceCriteriaTests(ApiFactory factory)
         Assert.StartsWith("2027-02-2", february.GetProperty("dueDate").GetString());   // the 28th (2027 is not a leap year)
     }
 
-    /// <summary>AC-VH-007: Given Category = Self Owned with no registration book uploaded, When Activate is pressed, Then activation is blocked with VAL-VH-014.</summary>
+    /// <summary>AC-VH-007 (superseded): Given Category = Self Owned with no registration book uploaded, When Activate is
+    /// pressed, Then activation succeeds — the missing book is a checklist reminder (VAL-VH-014), not a blocker,
+    /// for any category. It can be uploaded any time after activation.</summary>
     [Fact]
-    public async Task AC_VH_007_Activating_without_a_registration_book_is_blocked()
+    public async Task AC_VH_007_Activating_without_a_registration_book_is_only_a_reminder()
     {
         var w = await VehicleWorld.CreateAsync(factory);
         var vehicle = await w.CreateAsync(w.Truck());
@@ -317,7 +319,7 @@ public sealed class AcceptanceCriteriaTests(ApiFactory factory)
 
         var response = await w.Admin.PostAsJsonAsync($"/api/vehicles/{VehicleWorld.Id(vehicle)}/activate", new { category = "SelfOwned", details = new { }, rowVersion = fresh["rowVersion"]!.GetValue<string>() });
 
-        await PartnerWorld.AssertRefusedAsync(response, "documents", Msg.VhRegistrationBookRequired);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
     }
 
     /// <summary>

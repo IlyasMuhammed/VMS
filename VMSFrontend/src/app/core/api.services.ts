@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -73,6 +73,62 @@ import {
   UpdateCustomerTaxRuleRequest,
 } from './customer.models';
 import { CityModel, SaveCityRequest } from './city.models';
+import {
+  CreateAdvanceRequest,
+  CustomerAdvanceModel,
+  MoveAdvanceRequest,
+  RefundAdvanceRequest,
+  ReverseAdvanceRequest,
+} from './advance.models';
+import {
+  CustomerBalanceSummaryModel,
+  CustomerLedgerStatementFilter,
+  CustomerLedgerStatementModel,
+  InvoiceLedgerModel,
+  OpeningBalanceModel,
+  PostOpeningBalanceRequest,
+} from './ledger.models';
+import {
+  BankCashAccountModel,
+  CarryForwardModel,
+  CarryForwardRequest,
+  CreatePaymentReceiptRequest,
+  CreateSettlementRequest,
+  CustomerReceiptModel,
+  CustomerRefundModel,
+  InvoicePaymentReversalModel,
+  InvoiceSettlementModel,
+  ReceiptListItem,
+  ReceiptSearchFilter,
+  RecordInvoicePaymentRequest,
+  RefundCreditRequest,
+  ReverseSettlementRequest,
+  ReversePaymentRequest,
+  SaveBankCashAccountRequest,
+} from './payment.models';
+import {
+  CancelInvoiceRequest,
+  CreateInvoiceRequest,
+  EligibleTripsQuery,
+  EligibleTripsResult,
+  InvoiceAuditHistory,
+  InvoiceEvidenceDownloadModel,
+  InvoiceEvidenceModel,
+  InvoiceListItem,
+  InvoiceModel,
+  InvoiceRegenerationModel,
+  InvoiceSearchFilter,
+  InvoiceVersionModel,
+  RegenerateInvoiceRequest,
+  SubmitInvoiceRequest,
+} from './invoice.models';
+import {
+  CurrencySettingsModel,
+  ExchangeRateModel,
+  SaveCurrencyRequest,
+  SaveExchangeRateRequest,
+  UpdateCurrencySettingsRequest,
+} from './currency.models';
 import {
   CancelTripRequest,
   ChangeTripActiveRequest,
@@ -1008,15 +1064,41 @@ export class CustomersApi {
   }
 }
 
-/** §13A's own currency master (`api/currencies`) — `TRP.CURRENCY.MANAGE` only (Admin, §48.8's Currency Setup
- * screen); see {@link CurrencyModel}'s own doc comment for why a customer's currency field degrades gracefully
- * rather than this task widening that gate. */
+/** §13A's own currency master, tenant settings and exchange rates (`api/currencies`, `api/tenant/currency-settings`,
+ * `api/exchange-rates`; §48.8's Currency Setup screen) — `TRP.CURRENCY.MANAGE` for the master/settings,
+ * `TRP.EXCHANGERATE.MANAGE` for rates (§44: Finance can be granted rate maintenance without the rest); see
+ * {@link CurrencyModel}'s own doc comment for why a customer's currency field degrades gracefully rather than
+ * this task widening that gate. */
 @Injectable({ providedIn: 'root' })
 export class CurrenciesApi {
   private readonly http = inject(HttpClient);
 
   list(): Observable<CurrencyModel[]> {
     return this.http.get<ApiResponse<CurrencyModel[]>>(`${api}/currencies`).pipe(map((r) => r.data));
+  }
+
+  create(body: SaveCurrencyRequest): Observable<CurrencyModel> {
+    return this.http.post<ApiResponse<CurrencyModel>>(`${api}/currencies`, body).pipe(map((r) => r.data));
+  }
+
+  update(currencyCode: string, body: SaveCurrencyRequest): Observable<CurrencyModel> {
+    return this.http.put<ApiResponse<CurrencyModel>>(`${api}/currencies/${currencyCode}`, body).pipe(map((r) => r.data));
+  }
+
+  settings(): Observable<CurrencySettingsModel> {
+    return this.http.get<ApiResponse<CurrencySettingsModel>>(`${api}/tenant/currency-settings`).pipe(map((r) => r.data));
+  }
+
+  updateSettings(body: UpdateCurrencySettingsRequest): Observable<CurrencySettingsModel> {
+    return this.http.put<ApiResponse<CurrencySettingsModel>>(`${api}/tenant/currency-settings`, body).pipe(map((r) => r.data));
+  }
+
+  exchangeRates(): Observable<ExchangeRateModel[]> {
+    return this.http.get<ApiResponse<ExchangeRateModel[]>>(`${api}/exchange-rates`).pipe(map((r) => r.data));
+  }
+
+  createExchangeRate(body: SaveExchangeRateRequest): Observable<ExchangeRateModel> {
+    return this.http.post<ApiResponse<ExchangeRateModel>>(`${api}/exchange-rates`, body).pipe(map((r) => r.data));
   }
 }
 
@@ -1361,5 +1443,238 @@ export class TripOperationsApi {
   // ── Operational P&L (§31) ────────────────────────────────────────────────────────
   pnl(tripId: number): Observable<TripPnLModel> {
     return this.http.get<ApiResponse<TripPnLModel>>(`${api}/trips/${tripId}/pnl`).pipe(map((r) => r.data));
+  }
+}
+
+/**
+ * Invoice generation, detail, submit/cancel, list, history, regeneration and evidence (FSD §32-§41, §46.4-46.5,
+ * §48.5 screens 19-21 and 24). `search()` is not one of the FSD's own numbered screens — see `InvoiceListItem`'s
+ * own backend doc comment (mirrors the same gap `TripsApi.search` closed for trips: every other invoice screen
+ * there assumes one is already open, and nothing opens the first one). `versions()` IS one of the FSD's own
+ * literal endpoints (§48.5's own table: `GET /api/invoices/{id}/versions`).
+ */
+@Injectable({ providedIn: 'root' })
+export class InvoicesApi {
+  private readonly http = inject(HttpClient);
+
+  search(filter: InvoiceSearchFilter, page = 1, pageSize = 25): Observable<Paged<InvoiceListItem>> {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (filter.customerId != null) params = params.set('customerId', filter.customerId);
+    if (filter.status) params = params.set('status', filter.status);
+    if (filter.paymentStatus) params = params.set('paymentStatus', filter.paymentStatus);
+    if (filter.fromDate) params = params.set('fromDate', filter.fromDate);
+    if (filter.toDate) params = params.set('toDate', filter.toDate);
+    if (filter.isActive != null) params = params.set('isActive', filter.isActive);
+    if (filter.search) params = params.set('search', filter.search);
+    return this.http.get<ApiResponse<Paged<InvoiceListItem>>>(`${api}/invoices/search`, { params }).pipe(map((r) => r.data));
+  }
+
+  searchEligibleTrips(query: EligibleTripsQuery): Observable<EligibleTripsResult> {
+    return this.http.post<ApiResponse<EligibleTripsResult>>(`${api}/invoices/search-eligible-trips`, query).pipe(map((r) => r.data));
+  }
+
+  create(body: CreateInvoiceRequest): Observable<InvoiceModel> {
+    return this.http.post<ApiResponse<InvoiceModel>>(`${api}/invoices`, body).pipe(map((r) => r.data));
+  }
+
+  get(invoiceId: number): Observable<InvoiceModel> {
+    return this.http.get<ApiResponse<InvoiceModel>>(`${api}/invoices/${invoiceId}`).pipe(map((r) => r.data));
+  }
+
+  history(invoiceId: number, page = 1, pageSize = 50): Observable<InvoiceAuditHistory> {
+    const params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    return this.http.get<ApiResponse<InvoiceAuditHistory>>(`${api}/invoices/${invoiceId}/history`, { params }).pipe(map((r) => r.data));
+  }
+
+  /** §47.3's own literal body shape for this one endpoint: `Idempotency-Key` header + body `rowVersion` (this
+   * codebase's own established concurrency convention, not the FSD's literal `If-Match`) — `idempotencyKey`
+   * should be a fresh id per submit *attempt* (the same key on a retry safely replays the first response). */
+  submit(invoiceId: number, body: SubmitInvoiceRequest, idempotencyKey: string): Observable<InvoiceModel> {
+    const headers = new HttpHeaders().set('Idempotency-Key', idempotencyKey);
+    return this.http.post<ApiResponse<InvoiceModel>>(`${api}/invoices/${invoiceId}/submit`, body, { headers }).pipe(map((r) => r.data));
+  }
+
+  cancel(invoiceId: number, body: CancelInvoiceRequest): Observable<InvoiceModel> {
+    return this.http.post<ApiResponse<InvoiceModel>>(`${api}/invoices/${invoiceId}/cancel`, body).pipe(map((r) => r.data));
+  }
+
+  // ── Regeneration (§38, §39) — the "Versions" tab ─────────────────────────────────
+  versions(invoiceId: number): Observable<InvoiceVersionModel[]> {
+    return this.http.get<ApiResponse<InvoiceVersionModel[]>>(`${api}/invoices/${invoiceId}/versions`).pipe(map((r) => r.data));
+  }
+
+  regenerate(invoiceId: number, body: RegenerateInvoiceRequest): Observable<InvoiceRegenerationModel> {
+    return this.http.post<ApiResponse<InvoiceRegenerationModel>>(`${api}/invoices/${invoiceId}/regenerate`, body).pipe(map((r) => r.data));
+  }
+
+  // ── Evidence (§41) — the "Evidence" tab ──────────────────────────────────────────
+  evidence(invoiceId: number): Observable<InvoiceEvidenceModel[]> {
+    return this.http.get<ApiResponse<InvoiceEvidenceModel[]>>(`${api}/invoices/${invoiceId}/evidence`).pipe(map((r) => r.data));
+  }
+
+  downloadEvidence(invoiceId: number, evidenceId: number): Observable<InvoiceEvidenceDownloadModel> {
+    return this.http.get<ApiResponse<InvoiceEvidenceDownloadModel>>(`${api}/invoices/${invoiceId}/evidence/${evidenceId}/download`).pipe(map((r) => r.data));
+  }
+
+  retryEvidence(invoiceId: number, evidenceId: number): Observable<InvoiceEvidenceModel> {
+    return this.http.post<ApiResponse<InvoiceEvidenceModel>>(`${api}/invoices/${invoiceId}/evidence/${evidenceId}/retry`, {}).pipe(map((r) => r.data));
+  }
+
+  rerenderEvidence(invoiceId: number): Observable<InvoiceEvidenceModel> {
+    return this.http.post<ApiResponse<InvoiceEvidenceModel>>(`${api}/invoices/${invoiceId}/evidence/rerender`, {}).pipe(map((r) => r.data));
+  }
+}
+
+/** The company's own bank/cash accounts (§37) — view for whoever can record a payment, manage for Admin/Finance. */
+@Injectable({ providedIn: 'root' })
+export class BankAccountsApi {
+  private readonly http = inject(HttpClient);
+
+  list(includeInactive = false): Observable<BankCashAccountModel[]> {
+    return this.http.get<ApiResponse<BankCashAccountModel[]>>(`${api}/bank-accounts`, { params: new HttpParams().set('includeInactive', includeInactive) }).pipe(map((r) => r.data));
+  }
+
+  create(body: SaveBankCashAccountRequest): Observable<BankCashAccountModel> {
+    return this.http.post<ApiResponse<BankCashAccountModel>>(`${api}/bank-accounts`, body).pipe(map((r) => r.data));
+  }
+
+  update(id: number, body: SaveBankCashAccountRequest): Observable<BankCashAccountModel> {
+    return this.http.put<ApiResponse<BankCashAccountModel>>(`${api}/bank-accounts/${id}`, body).pipe(map((r) => r.data));
+  }
+}
+
+/**
+ * Receipts, settlements (write-off/discount) and credit handling (carry forward/refund) — FSD §37, §37.5, §40,
+ * §48.5/§48.8. `searchReceipts()` is the same kind of gap-fill as `TripsApi.search`/`InvoicesApi.search` — see
+ * `ReceiptListItem`'s own backend doc comment (the FSD names "Receipts List" explicitly, but nothing served it).
+ */
+@Injectable({ providedIn: 'root' })
+export class PaymentsApi {
+  private readonly http = inject(HttpClient);
+
+  // ── Receipts / payments (§37) ────────────────────────────────────────────────────
+  recordAgainstInvoice(invoiceId: number, body: RecordInvoicePaymentRequest): Observable<CustomerReceiptModel> {
+    return this.http.post<ApiResponse<CustomerReceiptModel>>(`${api}/invoices/${invoiceId}/payments`, body).pipe(map((r) => r.data));
+  }
+
+  createReceipt(body: CreatePaymentReceiptRequest): Observable<CustomerReceiptModel> {
+    return this.http.post<ApiResponse<CustomerReceiptModel>>(`${api}/customer-receipts`, body).pipe(map((r) => r.data));
+  }
+
+  searchReceipts(filter: ReceiptSearchFilter, page = 1, pageSize = 25): Observable<Paged<ReceiptListItem>> {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (filter.customerId != null) params = params.set('customerId', filter.customerId);
+    if (filter.paymentMethod) params = params.set('paymentMethod', filter.paymentMethod);
+    if (filter.bankCashAccountId != null) params = params.set('bankCashAccountId', filter.bankCashAccountId);
+    if (filter.status) params = params.set('status', filter.status);
+    if (filter.fromDate) params = params.set('fromDate', filter.fromDate);
+    if (filter.toDate) params = params.set('toDate', filter.toDate);
+    return this.http.get<ApiResponse<Paged<ReceiptListItem>>>(`${api}/customer-receipts/search`, { params }).pipe(map((r) => r.data));
+  }
+
+  getReceipt(customerReceiptId: number): Observable<CustomerReceiptModel> {
+    return this.http.get<ApiResponse<CustomerReceiptModel>>(`${api}/customer-receipts/${customerReceiptId}`).pipe(map((r) => r.data));
+  }
+
+  reversePayment(invoicePaymentId: number, body: ReversePaymentRequest): Observable<InvoicePaymentReversalModel> {
+    return this.http.post<ApiResponse<InvoicePaymentReversalModel>>(`${api}/invoice-payments/${invoicePaymentId}/reverse`, body).pipe(map((r) => r.data));
+  }
+
+  // ── Settlements — write-off / discount (§37.5) ──────────────────────────────────
+  createSettlement(invoiceId: number, body: CreateSettlementRequest): Observable<InvoiceSettlementModel> {
+    return this.http.post<ApiResponse<InvoiceSettlementModel>>(`${api}/invoices/${invoiceId}/settlements`, body).pipe(map((r) => r.data));
+  }
+
+  reverseSettlement(invoiceSettlementId: number, body: ReverseSettlementRequest): Observable<InvoiceSettlementModel> {
+    return this.http.post<ApiResponse<InvoiceSettlementModel>>(`${api}/invoice-settlements/${invoiceSettlementId}/reverse`, body).pipe(map((r) => r.data));
+  }
+
+  // ── Credit handling — carry forward / refund (§40) ──────────────────────────────
+  carryForward(invoiceId: number, body: CarryForwardRequest): Observable<CarryForwardModel> {
+    return this.http.post<ApiResponse<CarryForwardModel>>(`${api}/invoices/${invoiceId}/carry-forward`, body).pipe(map((r) => r.data));
+  }
+
+  refund(invoiceId: number, body: RefundCreditRequest): Observable<CustomerRefundModel> {
+    return this.http.post<ApiResponse<CustomerRefundModel>>(`${api}/invoices/${invoiceId}/refund`, body).pipe(map((r) => r.data));
+  }
+}
+
+/**
+ * Advances against Open trips (FSD §37.4) — a genuinely separate, Open-trip-first workflow from the
+ * invoice-centric `PaymentsApi` above: an advance is recorded against a specific trip (not an invoice), and is
+ * applied automatically once that trip's own invoice is Submitted (no controller action for that — it is the
+ * backend's own internal hook, see `AdvanceService.ApplyForTripAsync`).
+ */
+@Injectable({ providedIn: 'root' })
+export class AdvancesApi {
+  private readonly http = inject(HttpClient);
+
+  create(tripId: number, body: CreateAdvanceRequest): Observable<CustomerAdvanceModel> {
+    return this.http.post<ApiResponse<CustomerAdvanceModel>>(`${api}/trips/${tripId}/advances`, body).pipe(map((r) => r.data));
+  }
+
+  list(customerId?: number | null): Observable<CustomerAdvanceModel[]> {
+    let params = new HttpParams();
+    if (customerId != null) params = params.set('customerId', customerId);
+    return this.http.get<ApiResponse<CustomerAdvanceModel[]>>(`${api}/customer-advances`, { params }).pipe(map((r) => r.data));
+  }
+
+  move(customerAdvanceId: number, body: MoveAdvanceRequest): Observable<CustomerAdvanceModel> {
+    return this.http.post<ApiResponse<CustomerAdvanceModel>>(`${api}/customer-advances/${customerAdvanceId}/move`, body).pipe(map((r) => r.data));
+  }
+
+  refund(customerAdvanceId: number, body: RefundAdvanceRequest): Observable<CustomerAdvanceModel> {
+    return this.http.post<ApiResponse<CustomerAdvanceModel>>(`${api}/customer-advances/${customerAdvanceId}/refund`, body).pipe(map((r) => r.data));
+  }
+
+  reverse(customerAdvanceId: number, body: ReverseAdvanceRequest): Observable<CustomerAdvanceModel> {
+    return this.http.post<ApiResponse<CustomerAdvanceModel>>(`${api}/customer-advances/${customerAdvanceId}/reverse`, body).pipe(map((r) => r.data));
+  }
+}
+
+/**
+ * The Customer Ledger (FSD §40A.4): the customer statement, the invoice-scoped view, the all-customers balance
+ * list, and the one entry Admin ever posts directly — the go-live opening balance (L16). Every other ledger
+ * entry (L1-L15) is a side effect already reachable from its own screen (Submit, Record Payment, Regenerate, …).
+ */
+@Injectable({ providedIn: 'root' })
+export class LedgerApi {
+  private readonly http = inject(HttpClient);
+
+  private static params(filter: CustomerLedgerStatementFilter): HttpParams {
+    let params = new HttpParams();
+    if (filter.from) params = params.set('from', filter.from);
+    if (filter.to) params = params.set('to', filter.to);
+    if (filter.invoiceId != null) params = params.set('invoiceId', filter.invoiceId);
+    if (filter.currencyCode) params = params.set('currencyCode', filter.currencyCode);
+    if (filter.includeReversedPairs != null) params = params.set('includeReversedPairs', filter.includeReversedPairs);
+    return params;
+  }
+
+  statement(customerId: number, filter: CustomerLedgerStatementFilter): Observable<CustomerLedgerStatementModel> {
+    return this.http.get<ApiResponse<CustomerLedgerStatementModel>>(`${api}/customers/${customerId}/ledger`, { params: LedgerApi.params(filter) }).pipe(map((r) => r.data));
+  }
+
+  /** The same statement, as a PDF with the company header (§40A.4's own "Export PDF" action). */
+  statementPdf(customerId: number, filter: CustomerLedgerStatementFilter): Observable<{ blob: Blob; fileName: string }> {
+    return this.http.get(`${api}/customers/${customerId}/ledger/statement.pdf`, { params: LedgerApi.params(filter), responseType: 'blob', observe: 'response' }).pipe(
+      map((response) => {
+        const disposition = response.headers.get('Content-Disposition') ?? '';
+        const name = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1];
+        return { blob: response.body as Blob, fileName: name ? decodeURIComponent(name) : 'statement.pdf' };
+      }),
+    );
+  }
+
+  invoiceLedger(invoiceId: number): Observable<InvoiceLedgerModel> {
+    return this.http.get<ApiResponse<InvoiceLedgerModel>>(`${api}/invoices/${invoiceId}/ledger`).pipe(map((r) => r.data));
+  }
+
+  allBalances(): Observable<CustomerBalanceSummaryModel[]> {
+    return this.http.get<ApiResponse<CustomerBalanceSummaryModel[]>>(`${api}/customer-balances`).pipe(map((r) => r.data));
+  }
+
+  postOpeningBalance(customerId: number, body: PostOpeningBalanceRequest): Observable<OpeningBalanceModel> {
+    return this.http.post<ApiResponse<OpeningBalanceModel>>(`${api}/customers/${customerId}/opening-balance`, body).pipe(map((r) => r.data));
   }
 }

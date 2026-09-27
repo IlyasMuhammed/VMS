@@ -73,8 +73,16 @@ internal sealed class CustomerBillingConfigurationService(
         var errors = new List<ValidationError>();
         void Add(string field, string code, params (string Name, object? Value)[] values) => errors.Add(messages.Error(field, code, values));
 
-        if (current is not null && effectiveFrom <= current.EffectiveFrom)
-            Add("effectiveFrom", Msg.Min, ("Field", "Effective from"), ("Min", current.EffectiveFrom.AddDays(1).ToString("yyyy-MM-dd")));
+        // Strictly earlier is rejected (it would need EffectiveTo < EffectiveFrom on the row it closes); the
+        // SAME day is allowed — see the save below, which corrects the open row in place for that case rather
+        // than opening a new version. Unlike CustomerTaxRuleService's own same-day rejection (§14/AC-06's own
+        // literal rule), nothing here forces that: Billing Configuration's own "current" row is often one
+        // GetCurrentAsync lazily created the moment the tab was first opened (§13), so a same-day correction —
+        // the very first real save, made the same day — would otherwise always be refused until the next
+        // calendar day, for every customer, on nothing more than an accident of when the tab happened to be
+        // opened first.
+        if (current is not null && effectiveFrom < current.EffectiveFrom)
+            Add("effectiveFrom", Msg.Min, ("Field", "Effective from"), ("Min", current.EffectiveFrom.ToString("yyyy-MM-dd")));
 
         var settings = await db.CurrencySettings.AsNoTracking().FirstAsync(s => s.TenantId == tenant.TenantId, ct);
         var currencyCode = settings.MultiCurrencyEnabled && !string.IsNullOrWhiteSpace(request.CurrencyCode)
@@ -104,6 +112,21 @@ internal sealed class CustomerBillingConfigurationService(
             Add("statementEmailContactId", Msg.Invalid, ("Field", "Statement email contact"));
 
         if (errors.Count > 0) throw new ValidationException(errors);
+
+        // A same-day save corrects the still-open row in place — no new version, since nothing could have
+        // snapshotted the old values yet on the very day they started (GetAsOfAsync's own worked case, "the
+        // configuration in force at invoice generation," has nothing to preserve here: it would resolve to
+        // this exact row either way).
+        if (current is not null && effectiveFrom == current.EffectiveFrom)
+        {
+            current.PaymentTermsDays = paymentTermsDays; current.CurrencyCode = currencyCode;
+            current.DefaultBillingAddressId = request.DefaultBillingAddressId; current.DefaultInvoiceTemplateId = request.DefaultInvoiceTemplateId;
+            current.InvoiceNumberPrefix = prefix; current.PodRequired = request.PodRequired; current.EvidenceRequired = request.EvidenceRequired;
+            current.EvidencePageSize = evidencePageSize; current.DuplicateReferenceBehaviour = behaviour; current.CustomerReferenceRequired = request.CustomerReferenceRequired;
+            current.StatementEmailContactId = request.StatementEmailContactId;
+            await db.SaveChangesAsync(ct);
+            return ToModel(current);
+        }
 
         var next = new CustomerBillingConfiguration
         {

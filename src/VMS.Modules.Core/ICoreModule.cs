@@ -48,9 +48,18 @@ public static class CoreModuleExtensions
         services.AddScoped<IBranchDirectory>(sp => sp.GetRequiredService<BranchService>());
 
         // File storage: encrypted files on disk, scanned on the way in, served only through short-lived links.
+        // FileStorage:Provider picks the backend; Blob is reserved for when an account is available (Validate,
+        // called from UseCoreModule, refuses to start on Blob until then) — everything upstream goes through
+        // IFileStore, so wiring in a blob-backed implementation later only means adding a branch here.
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.Section));
         services.AddDataProtection().SetApplicationName("VMS");
-        services.AddScoped<IFileStore, LocalFileStore>();
+        services.AddScoped<IFileStore>(sp =>
+        {
+            var provider = sp.GetRequiredService<IOptions<FileStorageOptions>>().Value.Provider;
+            return string.Equals(provider, FileStorageProviders.Blob, StringComparison.OrdinalIgnoreCase)
+                ? throw new InvalidOperationException("FileStorage:Provider is Blob, but no blob-backed IFileStore is registered yet. Set it to Local.")
+                : ActivatorUtilities.CreateInstance<LocalFileStore>(sp);
+        });
         services.AddSingleton<FileDownloadLinks>();
         services.AddSingleton<IFileDownloadLinks>(sp => sp.GetRequiredService<FileDownloadLinks>());
         services.TryAddSingleton<IVirusScanner, BuiltInVirusScanner>();   // replace with a real engine before go-live

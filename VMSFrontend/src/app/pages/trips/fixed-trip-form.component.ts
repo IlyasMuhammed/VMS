@@ -5,7 +5,6 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
-import { AuthService } from '../../core/auth.service';
 import { apiErrors } from '../../core/api-error';
 import { TripConfigurationsApi, TripsApi } from '../../core/api.services';
 import { MessagesService } from '../../core/messages.service';
@@ -103,7 +102,6 @@ export class FixedTripFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(TripsApi);
   private readonly configsApi = inject(TripConfigurationsApi);
-  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly notify = inject(NotifyService);
   private readonly messages = inject(MessagesService);
@@ -115,7 +113,6 @@ export class FixedTripFormComponent {
   readonly configs = signal<TripConfigurationModel[]>([]);
   readonly vehicles = signal<TripConfigurationVehicleModel[]>([]);
   readonly rate = signal<RateResolutionResult | null>(null);
-  protected readonly canOverride = computed(() => this.auth.hasPermission('TRP.TRIP.OVERRIDEDRIVER'));
 
   readonly form = this.fb.group({
     customerId: this.fb.control<number | null>(null, Validators.required),
@@ -128,7 +125,7 @@ export class FixedTripFormComponent {
     remarks: this.fb.nonNullable.control(''),
   });
 
-  protected readonly configOptions = computed(() => this.configs().map((c) => ({ label: `${c.tripCode} — ${c.name}`, value: c.tripConfigurationId })));
+  protected readonly configOptions = computed(() => this.configs().filter((c) => c.status === 'Active').map((c) => ({ label: `${c.tripCode} — ${c.name}`, value: c.tripConfigurationId })));
   protected readonly vehicleOptions = computed(() => this.vehicles().filter((v) => v.status === 'Active').map((v) => ({ label: v.registrationNo || `#${v.vehicleId}`, value: v.vehicleId })));
   protected readonly needsOverrideReason = () => !!this.form.controls.driverId.value;
 

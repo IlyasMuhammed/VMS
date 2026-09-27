@@ -1,4 +1,34 @@
+using VMS.Shared.Pagination;
+
 namespace VMS.Modules.Trips.Models;
+
+/// <summary>§48.1: "History button on every record" — every child table this module has ever rooted back to
+/// "Invoice" (adjustments, tax lines, documents, evidence, settlements, receipts, payment transfers) shows up
+/// here too, not only edits to the invoice header itself. Named <c>InvoiceAudit*</c> rather than plain
+/// <c>InvoiceHistory</c> — that name is already taken by <see cref="Domain.InvoiceHistory"/>, CC-23's own
+/// dedicated status-transition log; this reads the generic <c>core.AuditEntries</c> table instead (the same
+/// mechanism <c>Customer</c>/<c>Trip</c> use for their own History tabs), which already captures every one of
+/// those same transitions too, since <c>Invoice</c> itself is <c>IAuditRooted</c>.</summary>
+public sealed class InvoiceAuditHistoryChange
+{
+    public long Id { get; set; }
+    public DateTime OccurredAt { get; set; }
+    public Guid GroupId { get; set; }
+    public string? UserName { get; set; }
+    public string Entity { get; set; } = string.Empty;
+    public string RecordId { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public string? Field { get; set; }
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public string? Reason { get; set; }
+    public bool Restricted { get; set; }
+}
+
+public sealed class InvoiceAuditHistory
+{
+    public PaginatedResponse<InvoiceAuditHistoryChange> Changes { get; set; } = new();
+}
 
 public sealed class CreateInvoiceAdjustmentRequest
 {
@@ -78,6 +108,18 @@ public sealed class InvoiceModel
     public long? CustomerInvoiceTemplateId { get; set; }
     public int? TemplateVersion { get; set; }
     public long? CustomerBillingAddressId { get; set; }
+    /// <summary>§12/§32/AC-04's own bill-to snapshot: "the address in force at generation, kept even if the
+    /// address later changes or is deactivated" — already stored on the entity since CC-23, exposed here so a
+    /// caller (and AC-04's own test) can actually see it holds, not just read it back off the raw table.</summary>
+    public string? BillToAddressName { get; set; }
+    public string? BillToAddressLine1 { get; set; }
+    public string? BillToAddressLine2 { get; set; }
+    public int? BillToCityId { get; set; }
+    public string? BillToProvinceState { get; set; }
+    public int? BillToCountryId { get; set; }
+    public string? BillToPostalCode { get; set; }
+    public string? BillToNtn { get; set; }
+    public string? BillToStrn { get; set; }
     public decimal TotalTripAmount { get; set; }
     public decimal TotalAdjustment { get; set; }
     public decimal GrossAmount { get; set; }

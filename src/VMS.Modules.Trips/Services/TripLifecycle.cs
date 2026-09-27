@@ -39,6 +39,12 @@ public static class TripLifecycle
          TripStatuses.AtPickup, TripStatuses.Loaded, TripStatuses.AtDelivery, TripStatuses.Delivered, TripStatuses.OnHold];
 
     public static bool IsNormalTransition(string from, string to) => NormalEdges.Contains((from, to));
+
+    /// <summary>§43's own "big button showing only the next valid action" — every normal-edge destination from
+    /// this status (more than one only at a branch point, e.g. Started → InTransit or AtPickup). Empty for a
+    /// terminal or Hold/Cancelled status; genuine skips (<c>TRP.TRIP.SKIPSTATUS</c>) are not offered here since
+    /// they need their own extra permission, not a driver-app button.</summary>
+    public static IReadOnlyList<string> NextStatuses(string from) => NormalEdges.Where(e => e.From == from).Select(e => e.To).ToList();
     public static bool CanHold(string from) => CanHoldFrom.Contains(from);
     public static bool CanCancel(string from) => CanCancelFrom.Contains(from);
 

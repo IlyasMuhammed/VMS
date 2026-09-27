@@ -20,6 +20,7 @@ public sealed class TripExpenseModel
     public int? DecidedBy { get; set; }
     public DateTime? DecidedAtUtc { get; set; }
     public string Source { get; set; } = string.Empty;
+    public Guid? ClientEventId { get; set; }
     public bool IsVoided { get; set; }
     public string? VoidReason { get; set; }
     public int? VoidedBy { get; set; }
@@ -41,6 +42,8 @@ public sealed class CreateTripExpenseRequest
     public int? BusinessPartnerId { get; set; }
     public string PaymentMethod { get; set; } = string.Empty;
     public long? AttachmentId { get; set; }
+    /// <summary>§43/AC-54: a retried offline sync with the same id is answered with the original entry.</summary>
+    public Guid? ClientEventId { get; set; }
 }
 
 /// <summary>§47.2 lists only "approve" (no separate "reject") — this one action reaches both outcomes of §29's

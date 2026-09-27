@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Trips.Data;
 using VMS.Modules.Trips.Domain;
@@ -15,6 +16,9 @@ public interface ITripFuelService
     Task<TripFuelListModel> ListAsync(long tripId, TripCaller caller, CancellationToken ct = default);
     Task<TripFuelModel> CreateAsync(long tripId, CreateTripFuelRequest request, TripCaller caller, CancellationToken ct = default);
     Task<TripFuelModel> VoidAsync(long tripFuelId, VoidTripFuelRequest request, int voidedByUserId, CancellationToken ct = default);
+    /// <summary>Not one of §47.2's own literal endpoints — added for the driver-sync facade (CC-45) to reload a
+    /// single entry by id (e.g. after a replayed <see cref="CreateTripFuelRequest.ClientEventId"/>).</summary>
+    Task<TripFuelModel> GetAsync(long tripFuelId, CancellationToken ct = default);
 }
 
 internal sealed class TripFuelService(TripsDbContext db, ITenantContext tenant, ICallerScope scope, IMessageCatalogue messages, ICurrencyService currency)
@@ -45,6 +49,15 @@ internal sealed class TripFuelService(TripsDbContext db, ITenantContext tenant, 
     {
         var trip = await FindTripAsync(tripId, ct);
         TripAccess.RequireFuelOrOwnDriver(trip, caller, scope, "Logging trip fuel");
+
+        // AC-54: a retried offline sync with the same ClientEventId is answered with the original entry, not a
+        // duplicate — the same mechanism CreateTripEventRequest.ClientEventId already established.
+        if (request.ClientEventId is { } clientId)
+        {
+            var existing = await db.TripFuels.AsNoTracking()
+                .FirstOrDefaultAsync(f => f.TenantId == tenant.TenantId && f.TripId == tripId && f.ClientEventId == clientId, ct);
+            if (existing is not null) return ToModel(existing);
+        }
 
         var errors = new List<ValidationError>();
         var warnings = new List<string>();
@@ -105,10 +118,18 @@ internal sealed class TripFuelService(TripsDbContext db, ITenantContext tenant, 
             TripId = tripId, VehicleId = trip.VehicleId, FuelDateTime = fuelDateTime, FuelType = request.FuelType, Quantity = request.Quantity, Rate = request.Rate,
             Amount = amount, Odometer = request.Odometer, StationName = Trim(request.StationName), CityId = request.CityId, PaymentMethod = request.PaymentMethod,
             FuelCardId = request.FuelCardId, OtherPaymentText = Trim(request.OtherPaymentText), AttachmentId = request.AttachmentId, Remarks = Trim(request.Remarks),
-            CurrencyCode = currencyCode, Source = TripAccess.IsOwnDriver(trip, scope) ? TripEventSources.DriverApp : TripEventSources.Manual
+            CurrencyCode = currencyCode, Source = TripAccess.IsOwnDriver(trip, scope) ? TripEventSources.DriverApp : TripEventSources.Manual, ClientEventId = request.ClientEventId
         };
         db.TripFuels.Add(entry);
-        await db.SaveChangesAsync(ct);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 } && request.ClientEventId is not null)
+        {
+            // Another request with the same ClientEventId won the race — same idiom TripEventService already uses.
+            db.Entry(entry).State = EntityState.Detached;
+            var winner = await db.TripFuels.AsNoTracking()
+                .FirstAsync(f => f.TenantId == tenant.TenantId && f.TripId == tripId && f.ClientEventId == request.ClientEventId, ct);
+            return ToModel(winner);
+        }
 
         var model = ToModel(entry);
         model.Warnings = warnings;
@@ -130,6 +151,13 @@ internal sealed class TripFuelService(TripsDbContext db, ITenantContext tenant, 
         return ToModel(entry);
     }
 
+    public async Task<TripFuelModel> GetAsync(long tripFuelId, CancellationToken ct = default)
+    {
+        var entry = await db.TripFuels.AsNoTracking().FirstOrDefaultAsync(f => f.TenantId == tenant.TenantId && f.TripFuelId == tripFuelId, ct)
+            ?? throw new NotFoundException($"Trip fuel entry {tripFuelId} was not found.");
+        return ToModel(entry);
+    }
+
     private async Task<Trip> FindTripAsync(long tripId, CancellationToken ct) =>
         await db.Trips.AsNoTracking().FirstOrDefaultAsync(t => t.TenantId == tenant.TenantId && t.TripId == tripId, ct)
         ?? throw new NotFoundException($"Trip {tripId} was not found.");
@@ -141,6 +169,6 @@ internal sealed class TripFuelService(TripsDbContext db, ITenantContext tenant, 
         TripFuelId = f.TripFuelId, TripId = f.TripId, VehicleId = f.VehicleId, FuelDateTime = f.FuelDateTime, FuelType = f.FuelType, Quantity = f.Quantity,
         Rate = f.Rate, Amount = f.Amount, Odometer = f.Odometer, StationName = f.StationName, CityId = f.CityId, PaymentMethod = f.PaymentMethod,
         FuelCardId = f.FuelCardId, OtherPaymentText = f.OtherPaymentText, AttachmentId = f.AttachmentId, Remarks = f.Remarks, CurrencyCode = f.CurrencyCode,
-        Source = f.Source, IsVoided = f.IsVoided, VoidReason = f.VoidReason, VoidedBy = f.VoidedBy, VoidedAtUtc = f.VoidedAtUtc
+        Source = f.Source, ClientEventId = f.ClientEventId, IsVoided = f.IsVoided, VoidReason = f.VoidReason, VoidedBy = f.VoidedBy, VoidedAtUtc = f.VoidedAtUtc
     };
 }

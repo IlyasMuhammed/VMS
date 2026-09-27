@@ -22,7 +22,12 @@
     "check:trip-configurations": "node --test scripts/check-trip-configurations.test.mjs",
     "check:fuel-cards": "node --test scripts/check-fuel-cards.test.mjs",
     "check:trips": "node --test scripts/check-trips.test.mjs",
-    "test": "npm run check:access && npm run check:shared && npm run check:datetime && npm run check:partners && npm run check:vehicles && npm run check:customers && npm run check:cities && npm run check:routes && npm run check:trip-configurations && npm run check:fuel-cards && npm run check:trips"
+    "check:currency-setup": "node --test scripts/check-currency-setup.test.mjs",
+    "check:invoices": "node --test scripts/check-invoices.test.mjs",
+    "check:payments": "node --test scripts/check-payments.test.mjs",
+    "check:advances": "node --test scripts/check-advances.test.mjs",
+    "check:ledger": "node --test scripts/check-ledger.test.mjs",
+    "test": "npm run check:access && npm run check:shared && npm run check:datetime && npm run check:partners && npm run check:vehicles && npm run check:customers && npm run check:cities && npm run check:routes && npm run check:trip-configurations && npm run check:fuel-cards && npm run check:trips && npm run check:currency-setup && npm run check:invoices && npm run check:payments && npm run check:advances && npm run check:ledger"
   },
   "dependencies": {
     "@angular/animations": "^19.2.0",

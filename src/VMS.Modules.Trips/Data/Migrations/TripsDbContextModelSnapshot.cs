@@ -1910,6 +1910,9 @@ namespace VMS.Modules.Trips.Data.Migrations
                     b.Property<int>("LastNumber")
                         .HasColumnType("int");
 
+                    b.Property<int>("Month")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1918,7 +1921,7 @@ namespace VMS.Modules.Trips.Data.Migrations
 
                     b.HasKey("InvoiceNumberCounterId");
 
-                    b.HasIndex("TenantId", "Year")
+                    b.HasIndex("TenantId", "Year", "Month")
                         .IsUnique();
 
                     b.ToTable("InvoiceNumberCounters", "trp");
@@ -2755,6 +2758,11 @@ namespace VMS.Modules.Trips.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<decimal?>("StartOdometer")
                         .HasColumnType("decimal(10,1)");
 
@@ -2822,6 +2830,10 @@ namespace VMS.Modules.Trips.Data.Migrations
                         .IsUnique();
 
                     b.HasIndex("TenantId", "VehicleId");
+
+                    b.HasIndex("TenantId", "DriverId", "Status");
+
+                    b.HasIndex("TenantId", "Status", "Source");
 
                     b.ToTable("Trips", "trp");
                 });
@@ -3110,6 +3122,9 @@ namespace VMS.Modules.Trips.Data.Migrations
                     b.Property<int?>("BusinessPartnerId")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("ClientEventId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime?>("DecidedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -3179,6 +3194,10 @@ namespace VMS.Modules.Trips.Data.Migrations
 
                     b.HasIndex("TenantId", "TripId");
 
+                    b.HasIndex("TripId", "ClientEventId")
+                        .IsUnique()
+                        .HasFilter("[ClientEventId] IS NOT NULL");
+
                     b.ToTable("TripExpenses", "trp");
                 });
 
@@ -3198,6 +3217,9 @@ namespace VMS.Modules.Trips.Data.Migrations
 
                     b.Property<int?>("CityId")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("ClientEventId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
@@ -3272,6 +3294,10 @@ namespace VMS.Modules.Trips.Data.Migrations
                     b.HasKey("TripFuelId");
 
                     b.HasIndex("TenantId", "TripId");
+
+                    b.HasIndex("TripId", "ClientEventId")
+                        .IsUnique()
+                        .HasFilter("[ClientEventId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "VehicleId", "FuelDateTime");
 
@@ -3354,6 +3380,9 @@ namespace VMS.Modules.Trips.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("TripIssueId"));
 
+                    b.Property<Guid?>("ClientEventId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -3400,6 +3429,10 @@ namespace VMS.Modules.Trips.Data.Migrations
                     b.HasKey("TripIssueId");
 
                     b.HasIndex("TenantId", "TripId");
+
+                    b.HasIndex("TripId", "ClientEventId")
+                        .IsUnique()
+                        .HasFilter("[ClientEventId] IS NOT NULL");
 
                     b.ToTable("TripIssues", "trp");
                 });

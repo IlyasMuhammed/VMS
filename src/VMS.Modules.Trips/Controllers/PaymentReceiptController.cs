@@ -43,6 +43,20 @@ public sealed class PaymentReceiptController(IPaymentReceiptService receipts, II
         return Ok(ApiResponse<CustomerReceiptModel>.Ok(await receipts.CreateAsync(request, User.GetUserId()), "Receipt recorded."));
     }
 
+    /// <summary>Receipts List (§48.5) — see <see cref="ReceiptListItem"/>'s own doc comment for why this exists.</summary>
+    [HttpGet("api/customer-receipts/search")]
+    [RequirePermission(PermissionCodes.TRP_PAYMENT_CREATE)]
+    public async Task<IActionResult> Search(
+        [FromQuery] int? customerId, [FromQuery] string? paymentMethod, [FromQuery] long? bankCashAccountId, [FromQuery] string? status,
+        [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int page = 1, [FromQuery] int pageSize = 25) =>
+        Ok(ApiResponse<PaginatedResponse<ReceiptListItem>>.Ok(await receipts.SearchAsync(
+            new ReceiptSearchFilter { CustomerId = customerId, PaymentMethod = paymentMethod, BankCashAccountId = bankCashAccountId, Status = status, FromDate = fromDate, ToDate = toDate },
+            page, pageSize)));
+
+    [HttpGet("api/customer-receipts/{customerReceiptId:long}")]
+    [RequirePermission(PermissionCodes.TRP_PAYMENT_CREATE)]
+    public async Task<IActionResult> Get(long customerReceiptId) => Ok(ApiResponse<CustomerReceiptModel>.Ok(await receipts.GetAsync(customerReceiptId)));
+
     /// <summary>§47.2: "GET /api/invoices/{id}/payments · /payment-transfers → History → Invoice.View."</summary>
     [HttpGet("api/invoices/{invoiceId:long}/payment-transfers")]
     [RequirePermission(PermissionCodes.TRP_INVOICE_VIEW)]

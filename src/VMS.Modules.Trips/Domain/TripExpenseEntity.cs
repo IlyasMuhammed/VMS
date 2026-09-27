@@ -32,6 +32,9 @@ internal sealed class TripExpense : ITenantScopedEntity, IAuditRooted
     public int? DecidedBy { get; set; }
     public DateTime? DecidedAtUtc { get; set; }
     public string Source { get; set; } = TripEventSources.Manual;
+    /// <summary>§43/AC-54: the same offline-dedup column <see cref="TripEvent.ClientEventId"/> already
+    /// established for the driver app.</summary>
+    public Guid? ClientEventId { get; set; }
 
     public bool IsVoided { get; set; }
     public string? VoidReason { get; set; }

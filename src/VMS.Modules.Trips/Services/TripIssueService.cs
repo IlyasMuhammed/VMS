@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using VMS.Modules.Trips.Data;
 using VMS.Modules.Trips.Domain;
@@ -16,6 +17,9 @@ public interface ITripIssueService
     Task<IReadOnlyList<TripIssueModel>> ListAsync(long tripId, TripCaller caller, CancellationToken ct = default);
     Task<TripIssueModel> CreateAsync(long tripId, CreateTripIssueRequest request, TripCaller caller, CancellationToken ct = default);
     Task<TripIssueModel> ResolveAsync(long tripIssueId, ResolveTripIssueRequest request, int resolvedByUserId, CancellationToken ct = default);
+    /// <summary>Not one of §47.2's own literal endpoints — added for the driver-sync facade (CC-45) to reload a
+    /// single entry by id (e.g. after a replayed <see cref="CreateTripIssueRequest.ClientEventId"/>).</summary>
+    Task<TripIssueModel> GetAsync(long tripIssueId, CancellationToken ct = default);
 }
 
 internal sealed class TripIssueService(TripsDbContext db, ITenantContext tenant, ICallerScope scope, IMessageCatalogue messages, ITripEventRecorder events, ITripLifecycleService lifecycle)
@@ -35,6 +39,14 @@ internal sealed class TripIssueService(TripsDbContext db, ITenantContext tenant,
         var trip = await FindTripAsync(tripId, ct);
         TripAccess.RequireStatusOrOwnDriver(trip, caller, scope, "Reporting a trip issue");
 
+        // AC-54: a retried offline sync with the same ClientEventId is answered with the original entry.
+        if (request.ClientEventId is { } clientId)
+        {
+            var existing = await db.TripIssues.AsNoTracking()
+                .FirstOrDefaultAsync(i => i.TenantId == tenant.TenantId && i.TripId == tripId && i.ClientEventId == clientId, ct);
+            if (existing is not null) return ToModel(existing);
+        }
+
         if (!TripIssueTypes.All.Contains(request.IssueType))
             throw new ValidationException(messages.Error("issueType", Msg.OneOf, ("Field", "Issue type"), ("Allowed", string.Join(", ", TripIssueTypes.All))));
         if (!IssueSeverities.All.Contains(request.Severity))
@@ -48,12 +60,19 @@ internal sealed class TripIssueService(TripsDbContext db, ITenantContext tenant,
         var issue = new TripIssue
         {
             TripId = tripId, IssueType = request.IssueType, Severity = request.Severity, Description = request.Description.Trim(),
-            PhotoDocumentId = request.PhotoDocumentId, ReportedBy = caller.UserId, ReportedAtUtc = DateTime.UtcNow
+            PhotoDocumentId = request.PhotoDocumentId, ReportedBy = caller.UserId, ReportedAtUtc = DateTime.UtcNow, ClientEventId = request.ClientEventId
         };
         db.TripIssues.Add(issue);
         events.Record(tripId, TripEventTypes.Issue, TripAccess.IsOwnDriver(trip, scope) ? TripEventSources.DriverApp : TripEventSources.Manual,
             caller.UserId, remarks: $"{request.IssueType}: {issue.Description}");
-        await db.SaveChangesAsync(ct);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 } && request.ClientEventId is not null)
+        {
+            db.Entry(issue).State = EntityState.Detached;
+            var winner = await db.TripIssues.AsNoTracking()
+                .FirstAsync(i => i.TenantId == tenant.TenantId && i.TripId == tripId && i.ClientEventId == request.ClientEventId, ct);
+            return ToModel(winner);
+        }
 
         if (request.PutOnHold)
         {
@@ -79,6 +98,13 @@ internal sealed class TripIssueService(TripsDbContext db, ITenantContext tenant,
         return ToModel(issue);
     }
 
+    public async Task<TripIssueModel> GetAsync(long tripIssueId, CancellationToken ct = default)
+    {
+        var issue = await db.TripIssues.AsNoTracking().FirstOrDefaultAsync(i => i.TenantId == tenant.TenantId && i.TripIssueId == tripIssueId, ct)
+            ?? throw new NotFoundException($"Trip issue {tripIssueId} was not found.");
+        return ToModel(issue);
+    }
+
     private async Task<Trip> FindTripAsync(long tripId, CancellationToken ct) =>
         await db.Trips.FirstOrDefaultAsync(t => t.TenantId == tenant.TenantId && t.TripId == tripId, ct)
         ?? throw new NotFoundException($"Trip {tripId} was not found.");
@@ -86,7 +112,7 @@ internal sealed class TripIssueService(TripsDbContext db, ITenantContext tenant,
     private static TripIssueModel ToModel(TripIssue i) => new()
     {
         TripIssueId = i.TripIssueId, TripId = i.TripId, IssueType = i.IssueType, Severity = i.Severity, Description = i.Description,
-        PhotoDocumentId = i.PhotoDocumentId, ReportedBy = i.ReportedBy, ReportedAtUtc = i.ReportedAtUtc, IsResolved = i.IsResolved,
+        PhotoDocumentId = i.PhotoDocumentId, ReportedBy = i.ReportedBy, ReportedAtUtc = i.ReportedAtUtc, ClientEventId = i.ClientEventId, IsResolved = i.IsResolved,
         ResolvedBy = i.ResolvedBy, ResolvedAtUtc = i.ResolvedAtUtc, ResolutionNotes = i.ResolutionNotes
     };
 }

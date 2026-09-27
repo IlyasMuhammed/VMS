@@ -422,15 +422,18 @@ public sealed class VehicleActivationTests(ApiFactory factory)
         Assert.Equal("Draft", Status(vehicle));
     }
 
+    /// <summary>The registration book is only ever a reminder, never a blocker — for a vehicle we own or lease
+    /// from a bank just as much as for a rented one. (Superseded BR-VH-015, which made it a hard requirement for
+    /// the first two: that made activation impossible until the paper copy was scanned in.)</summary>
     [Fact]
-    public async Task The_registration_book_is_required_for_a_vehicle_we_own_or_lease_and_only_a_warning_for_a_rented_one()
+    public async Task The_registration_book_is_only_ever_a_warning_never_a_blocker()
     {
         var w = await VehicleWorld.CreateAsync(factory, MissingBookCheck.Host(factory));
         var (_, owned) = await DraftAsync(w);
         var check = await CheckAsync(w, owned, await BodyAsync(w, owned, "SelfOwned"));
-        Assert.Contains(check["items"]!.AsArray(), i => i!["code"]!.GetValue<string>() == "registrationBook" && !i["ok"]!.GetValue<bool>() && i["blocking"]!.GetValue<bool>());
-        await PartnerWorld.AssertRefusedAsync(await Activate(w, owned, await BodyAsync(w, owned, "SelfOwned")), "documents", Msg.VhRegistrationBookRequired);   // AC-VH-007
-        Assert.Equal("Draft", Status(owned));
+        Assert.Contains(check["items"]!.AsArray(), i => i!["code"]!.GetValue<string>() == "registrationBook" && !i["ok"]!.GetValue<bool>() && !i["blocking"]!.GetValue<bool>());
+        Assert.True(check["canActivate"]!.GetValue<bool>());
+        Assert.True((await Activate(w, owned, await BodyAsync(w, owned, "SelfOwned"))).IsSuccessStatusCode);
 
         var lessor = await w.PartnerAsync("Vendor");
         var (_, rented) = await DraftAsync(w, price: 1000, paid: 1000);
@@ -442,14 +445,14 @@ public sealed class VehicleActivationTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task Once_the_registration_book_is_on_file_the_checklist_says_so_and_a_self_owned_vehicle_activates()
+    public async Task Once_the_registration_book_is_on_file_the_checklist_says_so()
     {
         var w = await VehicleWorld.CreateAsync(factory);
         var (_, vehicle) = await DraftAsync(w);
         var before = await CheckAsync(w, vehicle, await BodyAsync(w, vehicle, "SelfOwned"));
         var missing = before["items"]!.AsArray().Single(i => i!["code"]!.GetValue<string>() == "registrationBook")!;
         Assert.False(missing["ok"]!.GetValue<bool>());
-        Assert.False(before["canActivate"]!.GetValue<bool>());
+        Assert.True(before["canActivate"]!.GetValue<bool>());   // missing, but only a reminder — never blocks activation
 
         await w.UploadRegistrationBookAsync(Id(vehicle));
 

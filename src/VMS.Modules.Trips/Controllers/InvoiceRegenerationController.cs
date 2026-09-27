@@ -16,4 +16,9 @@ public sealed class InvoiceRegenerationController(IInvoiceRegenerationService re
     [RequirePermission(PermissionCodes.TRP_INVOICE_REGENERATE)]
     public async Task<IActionResult> Regenerate(long invoiceId, [FromBody] RegenerateInvoiceRequest request) =>
         Ok(ApiResponse<InvoiceRegenerationModel>.Ok(await regeneration.RegenerateAsync(invoiceId, request, User.GetUserId()), "Invoice regenerated."));
+
+    [HttpGet("versions")]
+    [RequirePermission(PermissionCodes.TRP_INVOICE_VIEW)]
+    public async Task<IActionResult> Versions(long invoiceId) =>
+        Ok(ApiResponse<IReadOnlyList<InvoiceVersionModel>>.Ok(await regeneration.ChainAsync(invoiceId)));
 }

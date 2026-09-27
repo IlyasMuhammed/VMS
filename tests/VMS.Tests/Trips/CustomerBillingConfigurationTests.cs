@@ -54,13 +54,40 @@ public sealed class CustomerBillingConfigurationTests(ApiFactory factory)
         Assert.Equal(30, asOfOld.GetProperty("paymentTermsDays").GetInt32());
     }
 
+    /// <summary>The real-world sequence a screen follows: GetCurrentAsync lazily creates today's own default the
+    /// moment the tab is first opened (§13), then the very first Save happens the same day. That must succeed —
+    /// it used to be unconditionally rejected until the next calendar day, for every customer, on nothing more
+    /// than an accident of when the tab happened to be opened first.</summary>
     [Fact]
-    public async Task A_new_version_cannot_start_on_or_before_the_current_ones_start()
+    public async Task A_same_day_save_corrects_the_open_row_in_place_instead_of_being_rejected()
     {
         var w = await TripsWorld.CreateAsync(factory);
         var customerId = await NewCustomerAsync(w.Admin);
         var current = await (await w.Admin.GetAsync($"/api/customers/{customerId}/billing-configuration")).DataAsync();
         var effectiveFrom = current.GetProperty("effectiveFrom").GetString();
+
+        var response = await w.Admin.PutAsJsonAsync($"/api/customers/{customerId}/billing-configuration",
+            new { paymentTermsDays = 45, invoiceNumberPrefix = "ACM", effectiveFrom });
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        var saved = await response.DataAsync();
+        Assert.Equal(45, saved.GetProperty("paymentTermsDays").GetInt32());
+        Assert.Equal(effectiveFrom, saved.GetProperty("effectiveFrom").GetString());
+        Assert.Null(saved.GetProperty("effectiveTo").GetString());
+
+        // Corrected in place, not superseded: asking "as of" that same day still shows the corrected value,
+        // not an original a moment-old default never really was "history."
+        var asOf = await (await w.Admin.GetAsync($"/api/customers/{customerId}/billing-configuration?asOf={effectiveFrom}")).DataAsync();
+        Assert.Equal(45, asOf.GetProperty("paymentTermsDays").GetInt32());
+    }
+
+    /// <summary>Backdating is still refused — it would need EffectiveTo earlier than EffectiveFrom on the row it closes.</summary>
+    [Fact]
+    public async Task A_new_version_cannot_start_before_the_current_ones_start()
+    {
+        var w = await TripsWorld.CreateAsync(factory);
+        var customerId = await NewCustomerAsync(w.Admin);
+        var current = await (await w.Admin.GetAsync($"/api/customers/{customerId}/billing-configuration")).DataAsync();
+        var effectiveFrom = DateOnly.Parse(current.GetProperty("effectiveFrom").GetString()!).AddDays(-1).ToString("yyyy-MM-dd");
 
         var response = await w.Admin.PutAsJsonAsync($"/api/customers/{customerId}/billing-configuration", new { effectiveFrom });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
